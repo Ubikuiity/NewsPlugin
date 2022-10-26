@@ -1,10 +1,10 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
+	"id": "News Plugin",
+	"name": "News Plugin",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
+	"description": "This plugin finds news in the files, either with specified icon or modification date",
+	"author": "Ubikuiity",
+	"_authorUrl": "https://obsidian.md",
 	"isDesktopOnly": false
 }
