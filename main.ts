@@ -1,17 +1,16 @@
 import { Console } from 'console';
-import { fstat, FSWatcher, Stats } from 'fs';
 import { addIcon, App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, SettingTab } from 'obsidian';
 import { text } from 'stream/consumers';
-import { ExampleView, VIEW_TYPE_EXAMPLE } from "./view";
-import * as fsp from 'fs/promises';
-// let fsp = require('fs/promises')
+import { NewsView, NEWS_PAGE_TYPE } from "./view";
 
 interface Settings {
 	newsLogo: string;
+	newsDelay: number;
 }
 
 const DEFAULT_SETTINGS: Settings = {
-	newsLogo: '❄'
+	newsLogo: '❄',
+	newsDelay: 7
 }
 
 export default class NewsPlugin extends Plugin {
@@ -21,20 +20,20 @@ export default class NewsPlugin extends Plugin {
 	async onload() {
 		// Handle settingsof plugin
 		await this.loadSettings();
-		const newsLogo = this.settings.newsLogo;
+		const newsLogo: string = this.settings.newsLogo;
+		const newsDelay: number = this.settings.newsDelay *24*60*60*1000;
 
 		// Register View
 		this.registerView(
-			VIEW_TYPE_EXAMPLE,
-			(leaf) => new ExampleView(leaf)
-		  );
+			NEWS_PAGE_TYPE,
+			(leaf) => new NewsView(leaf, newsLogo, newsDelay)
+		);
 
 		// This calls the menu where the user can change the parameters
 		this.addSettingTab(new SettingsMenu(this.app, this));
 
 		// Add custom ribbon to library
 		addIcon('New', `<text x="50" y="70" font-size="45" text-anchor="middle" fill="white">NEW</text>`);
-		const basePath = (this.app.vault.adapter as any).basePath;
 
 		// This part creates the ribbon Icon to display the news view
 		const ribbonIconEl2 = this.addRibbonIcon('dice', 'News Menu', (evt: MouseEvent) => {
@@ -46,42 +45,28 @@ export default class NewsPlugin extends Plugin {
 			// Called when the user clicks the icon.
 			new Notice(`The news logo is : ${newsLogo}`);
 		});
-
-		// iterates over all files, get their modification dates and check if they contains the new icon
-		const files = this.app.vault.getMarkdownFiles();
-		for (let i = 0; i < files.length; i++){
-			let fPath: string = files[i].path;
-			const pathOfFile :string = basePath + `\\` + fPath
-			const modDate: Date = await getModificationDate(pathOfFile);
-			console.log(`File was modified on : ${modDate}`);
-
-			const content :string = await this.app.vault.cachedRead(files[i]);
-			
-			if (content.search(newsLogo) != -1){
-				console.log(`Found new file : ${fPath}`)
-			}
-		}
 	}
 
 	async activateMenu() {
+
 		// this is to avoid having multiple leaves in the right pane all the same
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_EXAMPLE);
+		this.app.workspace.detachLeavesOfType(NEWS_PAGE_TYPE);
 		
 		// this create the leaf on the right pane
 		await this.app.workspace.getRightLeaf(false).setViewState({
-			type: VIEW_TYPE_EXAMPLE,
+			type: NEWS_PAGE_TYPE,
 			active: true,
 		});
 
 		// Reveals the Right Leaf, because it needs user to show it otherwise
 		this.app.workspace.revealLeaf(
-			this.app.workspace.getLeavesOfType(VIEW_TYPE_EXAMPLE)[0]
+			this.app.workspace.getLeavesOfType(NEWS_PAGE_TYPE)[0]
 		);
 	}
 
 	onunload() {
 		// this avoid leaving the leaf if the plugin is removed
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_EXAMPLE);
+		this.app.workspace.detachLeavesOfType(NEWS_PAGE_TYPE);
 	}
 
 	async loadSettings() {
@@ -91,12 +76,6 @@ export default class NewsPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-}
-
-// Function that gets last modification date of file
-async function getModificationDate(pathToExplore: string): Promise<Date>{
-	const stats: Stats = await fsp.stat(pathToExplore);
-	return stats.mtime;
 }
 
 // This creates the menu where the user can change the parameters
@@ -114,7 +93,7 @@ export class SettingsMenu extends PluginSettingTab{
 
 		new Setting(containerEl)
 			.setName("NewsLogo")
-			.setDesc("Logo utilisé pour marquer les News")
+			.setDesc("Icon used to mark news by hand")
 			.addText((text) => 
 				text
 					.setPlaceholder("Logo des News")
@@ -124,5 +103,18 @@ export class SettingsMenu extends PluginSettingTab{
 						await this.plugin.saveSettings();
 					})
 			)
+
+		new Setting(containerEl)
+		.setName("News delay")
+		.setDesc("Time before considering an article 'not new anymore' (in days)")
+		.addText((text) => 
+			text
+				.setPlaceholder("number of days")
+				.setValue(this.plugin.settings.newsDelay.toString())
+				.onChange(async (value) =>{
+					this.plugin.settings.newsDelay = Number(value);
+					await this.plugin.saveSettings();
+				})
+		)
 	}
 }

@@ -5,6 +5,5 @@
 	"minAppVersion": "0.15.0",
 	"description": "This plugin finds news in the files, either with specified icon or modification date",
 	"author": "Ubikuiity",
-	"_authorUrl": "https://obsidian.md",
 	"isDesktopOnly": false
 }
