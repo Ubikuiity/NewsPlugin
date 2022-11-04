@@ -23,12 +23,6 @@ export default class NewsPlugin extends Plugin {
 		const newsLogo: string = this.settings.newsLogo;
 		const newsDelay: number = this.settings.newsDelay *24*60*60*1000;
 
-		// Register View
-		this.registerView(
-			NEWS_PAGE_TYPE,
-			(leaf) => new NewsView(leaf, newsLogo, newsDelay)
-		);
-
 		// This calls the menu where the user can change the parameters
 		this.addSettingTab(new SettingsMenu(this.app, this));
 
@@ -37,7 +31,6 @@ export default class NewsPlugin extends Plugin {
 
 		// This part creates the ribbon Icon to display the news view
 		const ribbonIconEl2 = this.addRibbonIcon('dice', 'News Menu', (evt: MouseEvent) => {
-			this.activateMenu();
 		})
 
 		// This creates the news Icon
@@ -47,26 +40,7 @@ export default class NewsPlugin extends Plugin {
 		});
 	}
 
-	async activateMenu() {
-
-		// this is to avoid having multiple leaves in the right pane all the same
-		this.app.workspace.detachLeavesOfType(NEWS_PAGE_TYPE);
-		
-		// this create the leaf on the right pane
-		await this.app.workspace.getRightLeaf(false).setViewState({
-			type: NEWS_PAGE_TYPE,
-			active: true,
-		});
-
-		// Reveals the Right Leaf, because it needs user to show it otherwise
-		this.app.workspace.revealLeaf(
-			this.app.workspace.getLeavesOfType(NEWS_PAGE_TYPE)[0]
-		);
-	}
-
 	onunload() {
-		// this avoid leaving the leaf if the plugin is removed
-		this.app.workspace.detachLeavesOfType(NEWS_PAGE_TYPE);
 	}
 
 	async loadSettings() {

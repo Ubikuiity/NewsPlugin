@@ -2,6 +2,8 @@ import { ItemView, ListItemCache, TFile, WorkspaceLeaf } from "obsidian";
 import * as fsp from 'fs/promises';
 import { fstat, FSWatcher, Stats } from 'fs';
 
+// View to show news. Not used anymore
+
 export const NEWS_PAGE_TYPE = "NEWS_VIEW_PAGE";
 
 export class NewsView extends ItemView {
@@ -41,7 +43,7 @@ export class NewsView extends ItemView {
 				console.log(`File ${fPath} is recent`);
         detectedNewFiles.push(files[i]);
 			}
-
+      
 			const content :string = await this.app.vault.cachedRead(files[i]);
 			
 			if (content.search(this.newsLogo) != -1){
