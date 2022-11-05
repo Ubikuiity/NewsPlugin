@@ -1,9 +1,9 @@
 {
 	"id": "News Plugin",
 	"name": "News Plugin",
-	"version": "1.0.0",
+	"version": "1.0",
 	"minAppVersion": "0.15.0",
 	"description": "This plugin finds news in the files, either with specified icon or modification date",
 	"author": "Ubikuiity",
-	"isDesktopOnly": false
+	"isDesktopOnly": true
 }

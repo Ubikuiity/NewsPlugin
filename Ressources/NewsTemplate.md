@@ -3,11 +3,9 @@
 Marked News
 ---
 
-[[Divers webstart]]
-[[Divers TPE]]
+%MNews%
 
 Detected News
 ---
 
-[[XXX]]
-[[XXXXX]]
+%DNews%
