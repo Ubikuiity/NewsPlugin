@@ -1,8 +1,11 @@
-import { addIcon, App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, SettingTab } from 'obsidian';
+import { addIcon, App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, SettingTab, WorkspaceSplit } from 'obsidian';
 import { fileCreator } from "filecreator";
 import { newIc, newSyncIc } from "icons";
+import { exec } from 'child_process';
+import { rename, access } from 'fs/promises';
+import { fips } from 'crypto';
 
-interface Settings {
+export interface Settings {
 	newsLogo: string;
 	newsDelay: number;
 	newsFilename: string;
@@ -21,30 +24,41 @@ export default class NewsPlugin extends Plugin {
 	async onload() {
 		// Handle settingsof plugin
 		await this.loadSettings();
-		const newsLogo: string = this.settings.newsLogo;
-		const newsDelay: number = this.settings.newsDelay * 24 * 60 * 60 * 1000;
+		const basePath = (this.app.vault.adapter as any).basePath;
 
 		//Create the display Handler
-		const displayH = new fileCreator(this.settings.newsFilename, this.app.vault, newsDelay, newsLogo);
+		const displayH = new fileCreator(this.app.vault, this.settings);
 
 		// This calls the menu where the user can change the parameters
 		this.addSettingTab(new SettingsMenu(this.app, this));
 
 		// Add custom ribbon to library
 		addIcon('New', newIc);
-		addIcon('NewSynchro', newSyncIc)
+		addIcon('NewSynchro', newSyncIc);
 
 		// This part creates the ribbon Icon to display the news view
 		const ribbonIconEl2 = this.addRibbonIcon('NewSynchro', 'News Synchro', (evt: MouseEvent) => {
 			displayH.synchroAll();
 			new Notice(`reloading news page, please don't spam this button`);
-		})
+		});
+
+		// This part opens the template file used for news
+		const ribbonIconEl3 = this.addRibbonIcon('go-to-file', 'Template News', (evt: MouseEvent) => {
+			const tempFile = basePath + `\\.obsidian\\plugins\\FirstPlugin\\Ressources\\NewsTemplate.md`;
+			exec(`start notepad++ ${tempFile}`);
+		});
 
 		// This creates the news Icon
 		const ribbonIconEl = this.addRibbonIcon('New', 'News Icon', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			new Notice(`The news logo is : ${newsLogo}`);
-		});
+			new Notice(`The news logo is : ${this.settings.newsLogo}`);
+			const leaves = this.app.workspace.getLeavesOfType('markdown');
+			// console.log(this.app.workspace.)
+			// for (const leaf of leaves){
+			// 	console.log(leaf.getDisplayText());
+			// 	console.log(leaf.getContainer());
+			// }
+			});
 	}
 
 	onunload() {
@@ -106,6 +120,8 @@ export class SettingsMenu extends PluginSettingTab {
 					.setPlaceholder("file name")
 					.setValue(this.plugin.settings.newsFilename.toString())
 					.onChange(async (value) => {
+						const basePath: string = (this.plugin.app.vault.adapter as any).basePath;
+						const oldFilePath: string = basePath + '\\' + this.plugin.settings.newsFilename;
 						if (value.contains(`.`)) {
 							value = value.split(`.`)[0] + `.md`;
 						}
@@ -113,6 +129,13 @@ export class SettingsMenu extends PluginSettingTab {
 							value = value + `.md`;
 						}
 						this.plugin.settings.newsFilename = value;
+						const newFilePath: string =  basePath + '\\' + value;
+						try {
+							await access(oldFilePath);
+							rename(oldFilePath, newFilePath);
+						} catch {
+							// News file might not be created yet
+						}
 						await this.plugin.saveSettings();
 					})
 			)

@@ -2,16 +2,15 @@
 import { Vault, TFile } from "obsidian";
 import { Stats } from "fs";
 import * as fsp from 'fs/promises';
-import { fileURLToPath } from "url";
+import { Settings } from "main";
 
 export class fileCreator {
 
-    saveFileName: string;
     obsVault: Vault;
-    nDelay: number;
-    nLogo: string;
+    pSettings: Settings;
     detectedNewFiles: Array<TFile> = [];
     markedNewFiles: Array<TFile> = [];
+    pointedNewFiles: Array<string> = [];
 
     templateStructure: string;
     newsData: string;
@@ -19,17 +18,13 @@ export class fileCreator {
     /**
      * Class qui construit le fichier News
      * 
-     * @param fileName - string, nom du fichier news qui sera crée
      * @param cVault - Vault actuel
-     * @param newsDelay - parametre newsDelay du plugin
-     * @param newsLogo - parametre newsLogo du plugin
+     * @param pluginSettings - settings du plugin
      * 
      */
-    constructor(fileName: string, cVault: Vault, newsDelay: number, newsLogo: string) {
-        this.saveFileName = fileName;
+    constructor(cVault: Vault, pluginSettings: Settings) {
         this.obsVault = cVault;
-        this.nDelay = newsDelay;
-        this.nLogo = newsLogo;
+        this.pSettings = pluginSettings;
         console.log("creating class filecreator");
     }
 
@@ -53,16 +48,17 @@ export class fileCreator {
         // Reseting new files
         this.detectedNewFiles = [];
         this.markedNewFiles = [];
+        this.pointedNewFiles = [];
 
         const basePath = (this.obsVault.adapter as any).basePath;
         const files = this.obsVault.getMarkdownFiles();
         for (let i = 0; i < files.length; i++) {
             const fPath: string = files[i].path;
-            const pathOfFile: string = basePath + `\\` + fPath
+            const pathOfFile: string = basePath + `\\` + fPath;
             const modDate: Date = await getModificationDate(pathOfFile);
             const now: Date = new Date();
             // Checking if date of modification is recent
-            if (now.getTime() - modDate.getTime() < this.nDelay) {
+            if (now.getTime() - modDate.getTime() < this.pSettings.newsDelay * 24 * 60 * 60 * 1000) {
                 // console.log(`File ${fPath} is recent`);
                 this.detectedNewFiles.push(files[i]);
             }
@@ -70,8 +66,26 @@ export class fileCreator {
             const content: string = await this.obsVault.cachedRead(files[i]);
 
             // this part needs to be done again, the marked file detection is not accurate
-            if (content.search(this.nLogo) != -1) {
+            if (content.search(this.pSettings.newsLogo) != -1) {
                 // console.log(`Found marked new file : ${fPath}`)
+
+                const pathMarkedFile: string = basePath + `\\` + fPath;
+                const file = await fsp.open(pathMarkedFile);
+                const data = (await file.readFile()).toString("utf8");
+
+                // looking for links marked as new in the file
+                const rePattern = new RegExp(`\\[{2}.*${this.pSettings.newsLogo}`, "g"); // Regex pattern
+                const matches = data.matchAll(rePattern);
+                for (const match of matches) {
+                    const matchString: string = match[0];
+                    // console.log(`Found \n ${matchString}`);
+                    const rePattern2 = new RegExp(`\\[{2}.*\\]{2}`, "g");
+                    const match2 = matchString.match(rePattern2);
+                    if (match2) {
+                        const newFileLink: string = match2[0];
+                        this.pointedNewFiles.push(newFileLink);
+                    }
+                }
                 this.markedNewFiles.push(files[i]);
             }
         }
@@ -88,20 +102,25 @@ export class fileCreator {
             return -(a[0] > b[0]) || +(a[0] < b[0]);
         })
 
-        this.detectedNewFiles = sortableArray.map(x => x[1]);
+        this.detectedNewFiles = sortableArray.map(x => x[1]) as Array<TFile>;
+
+        console.log(`Found new files :
+        Detected files : ${this.detectedNewFiles.length}
+        Marked files : ${this.markedNewFiles.length}
+        Pointed Files : ${this.pointedNewFiles.length}`);
     }
 
     // fourth to go
     async writeNewsFile() {
         const basePath = (this.obsVault.adapter as any).basePath;
-        const finalSavePath: string = basePath + `\\` + this.saveFileName;
+        const finalSavePath: string = basePath + `\\` + this.pSettings.newsFilename;
 
         console.log(`Writing news file... Path :\n ${finalSavePath}`);
         const data = new Uint8Array(Buffer.from(this.newsData));
         await fsp.writeFile(finalSavePath, data);
     }
 
-    // second to go
+    // second to go, HARD CODED PATH HERE
     async readTemplateFile() {
         const basePath = (this.obsVault.adapter as any).basePath;
         const pathOfTemplate: string = basePath + `\\.obsidian\\plugins\\FirstPlugin\\Ressources\\NewsTemplate.md`;
@@ -138,8 +157,8 @@ export class fileCreator {
             }
 
             finalData += split2[1]; // adding template part 2
-            for (let i = 0; i < this.markedNewFiles.length; i++) {
-                finalData += `[[${this.markedNewFiles[i].name}]]\n`; // adding files paths
+            for (let i = 0; i < this.pointedNewFiles.length; i++) {
+                finalData += this.pointedNewFiles[i] + `\n`; // adding files paths
             }
 
             finalData += part2; // adding template part 3 (part 2 of split 1)
@@ -150,8 +169,8 @@ export class fileCreator {
             const split2: string[] = part2.split("%DNews%");
             // console.log(`split1 : ${split2[0]} \n split2 : ${split2[1]}`)
             finalData += part1; // adding template part 1
-            for (let i = 0; i < this.markedNewFiles.length; i++) {
-                finalData += `[[${this.markedNewFiles[i].name}]]\n`; // adding files paths
+            for (let i = 0; i < this.pointedNewFiles.length; i++) {
+                finalData += this.pointedNewFiles[i] + `\n`; // adding files paths
             }
 
             finalData += split2[0]; // adding template part 2
