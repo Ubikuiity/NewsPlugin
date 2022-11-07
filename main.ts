@@ -14,7 +14,7 @@ export interface Settings {
 const DEFAULT_SETTINGS: Settings = {
 	newsLogo: '❄',
 	newsDelay: 7,
-	newsFilename: 'News'
+	newsFilename: 'News.md'
 }
 
 export default class NewsPlugin extends Plugin {
