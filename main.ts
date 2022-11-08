@@ -45,7 +45,7 @@ export default class NewsPlugin extends Plugin {
 		// This part opens the template file used for news
 		const ribbonIconEl3 = this.addRibbonIcon('go-to-file', 'Template News', (evt: MouseEvent) => {
 			const tempFile = basePath + `\\.obsidian\\plugins\\FirstPlugin\\Ressources\\NewsTemplate.md`;
-			exec(`start notepad++ ${tempFile}`);
+			exec(`start notepad++ "${tempFile}"`);
 		});
 
 		// This creates the news Icon
