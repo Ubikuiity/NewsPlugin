@@ -2,6 +2,8 @@ import { App, ButtonComponent, PluginSettingTab, Setting, TextComponent } from '
 import NewsPlugin from 'main';
 import { rename, access } from 'fs/promises';
 import { exec } from 'child_process';
+import * as path from 'path';
+import { platform } from 'process';
 
 export interface Settings {
 	newsLogo: string;
@@ -69,7 +71,7 @@ export class SettingsMenu extends PluginSettingTab {
 					.setValue(this.plugin.settings.newsFilename.toString())
 					.onChange(async (value) => {
 						const basePath: string = (this.plugin.app.vault.adapter as any).basePath;
-						const oldFilePath: string = basePath + '\\' + this.plugin.settings.newsFilename;
+						const oldFilePath: string = path.join(basePath, this.plugin.settings.newsFilename);
 						// Checks if the file already contains '.md', append it to the end otherwise
 						if (value.contains(`.`)) {
 							value = value.split(`.`)[0] + `.md`; // This makes sure that file name ends with .md
@@ -78,7 +80,7 @@ export class SettingsMenu extends PluginSettingTab {
 							value = value + `.md`;
 						}
 						this.plugin.settings.newsFilename = value;
-						const newFilePath: string =  basePath + '\\' + value;
+						const newFilePath: string =  path.join(basePath, value);
 						try {
 							await access(oldFilePath);  // If path exists, execute next line
 							rename(oldFilePath, newFilePath);  // rename old file to new file name
@@ -92,17 +94,19 @@ export class SettingsMenu extends PluginSettingTab {
         // Creates a button for editing the template file with Notepad++
         const templateSetting = new Setting(containerEl)
         templateSetting.setDesc(`Use this button to edit the template file used to create the News file.
-            You must use the %MNews% and %DNews% respectively for the marked news and detected news locations.
-            This button requires Notepad++ installed your computer. (Windows only)`);
+            You must use the %MNews% and %DNews% respectively for the marked news and detected news locations.\n\n
+			This requires notepad++ on Windows or gedit on Linux`);
         templateSetting.addButton((button: ButtonComponent) => {
             button.setClass('templateButton');
             button.setButtonText('Template File');
             button.onClick(() => {
                 // This part opens the template file used for news
                 const basePath = (this.plugin.app.vault.adapter as any).basePath;
-                // TODO this must be changed to support other OS
-                const tempFile = basePath + `\\.obsidian\\plugins\\${this.plugin.manifest.id}\\Ressources\\NewsTemplate.md`;
-                exec(`start notepad++ "${tempFile}"`);
+                const tempFile = path.join(basePath, '.obsidian', 'plugins', this.plugin.manifest.id, 'Ressources', 'NewsTemplate.md');
+                
+				// This is the part that needs to me modified to support multiples OS
+				if (platform == 'win32'){exec(`start notepad++ "${tempFile}"`)}
+				else if (platform == 'linux'){exec(`gedit "${tempFile}"`)};
             });
         });
 
@@ -124,7 +128,6 @@ export class SettingsMenu extends PluginSettingTab {
 
 				let count = 0;
 				for(let specialPath of this.plugin.settings.specialPaths){
-					console.log(`creating menu : index ${count}, value : ${specialPath}`);
 					count ++;
 				}
 
@@ -160,8 +163,8 @@ export class SettingsMenu extends PluginSettingTab {
 			.addButton((button: ButtonComponent) => {
 				button.setIcon('cross')
 				button.onClick((evt: MouseEvent) => {
-					// We can't remove the value as it would shift all indexes by 1, messing all the menu, so we put an empty string
 					console.log(`removing plugin special path`);
+					// We can't remove the value as it would shift all indexes by 1, messing all the menu, so we put an empty string
 					this.plugin.settings.specialPaths[listIndex] = '';
 					pathHTMLElement.remove();  // removes the HTML element
 				})

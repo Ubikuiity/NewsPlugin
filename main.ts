@@ -12,7 +12,7 @@ export default class NewsPlugin extends Plugin {
 		await this.loadSettings();
 
 		//Create the news page creator class, this is a custom class
-		const pageCreator = new fileCreator(this.app.vault, this.settings, this.manifest.id);
+		const pageCreator = new fileCreator(this);
 
 		// This calls the menu where the user can change the parameters
 		this.addSettingTab(new SettingsMenu(this.app, this));

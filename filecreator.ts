@@ -3,9 +3,12 @@ import { Vault, TFile } from "obsidian";
 import { Stats } from "fs";
 import * as fsp from 'fs/promises';
 import { Settings } from "settingsClass";
+import NewsPlugin from "main";
+import * as path from "path";
 
 export class fileCreator {
 
+    mainPlugin: NewsPlugin
     obsVault: Vault;
     pSettings: Settings;
     pluginName: string;
@@ -19,14 +22,13 @@ export class fileCreator {
     /**
      * Class qui construit le fichier News
      * 
-     * @param cVault - Vault actuel
-     * @param pluginSettings - settings du plugin
-     * 
+     * @param plugin Main plugin
      */
-    constructor(cVault: Vault, pluginSettings: Settings, pluginId: string) {
-        this.obsVault = cVault;
-        this.pSettings = pluginSettings;
-        this.pluginName = pluginId;
+    constructor(plugin: NewsPlugin) {
+        this.mainPlugin = plugin;
+        this.obsVault = plugin.app.vault;
+        this.pSettings = plugin.settings;
+        this.pluginName = plugin.manifest.id;
         console.log("creating class filecreator");
     }
 
@@ -58,7 +60,7 @@ export class fileCreator {
         for (let mdFile of files) {
             const fPath: string = mdFile.path;
             if (checkIsNotSpecialPath(fPath, this.pSettings.specialPaths)){
-                const pathOfFile: string = basePath + `\\` + fPath;
+                const pathOfFile: string = path.join(basePath, fPath);
                 const modDate: Date = await getModificationDate(pathOfFile);
                 const now: Date = new Date();
                 // Checking if date of modification is recent
@@ -71,9 +73,7 @@ export class fileCreator {
 
                 // This part detects marked and pointed files
                 if (content.includes(this.pSettings.newsLogo)) {
-                    // console.log(`Found marked new file : ${fPath}`)
-
-                    const pathMarkedFile: string = basePath + `\\` + fPath;
+                    const pathMarkedFile: string = path.join(basePath, fPath);
                     const file = await fsp.open(pathMarkedFile);
                     const data = (await file.readFile()).toString("utf8");
 
@@ -98,7 +98,7 @@ export class fileCreator {
         // sort detected files by creation date (most recent are the first of the list)
 
         const sortableArray = await Promise.all(this.detectedNewFiles.map(async (file: TFile) => {
-            const fPath: string = basePath + `\\` + file.path;
+            const fPath: string = path.join(basePath, file.path);
             const fDate: Date = await getModificationDate(fPath);
             return [fDate.getTime(), file];
         }));
@@ -118,7 +118,7 @@ export class fileCreator {
     // second to go, this reads the template file
     async readTemplateFile() {
         const basePath = (this.obsVault.adapter as any).basePath;
-        const pathOfTemplate: string = basePath + `\\.obsidian\\plugins\\${this.pluginName}\\Ressources\\NewsTemplate.md`;
+        const pathOfTemplate: string = path.join(basePath, `.obsidian`, `plugins`, this.pluginName, `Ressources`, `NewsTemplate.md`);
         const file = await fsp.open(pathOfTemplate);
         this.templateStructure = (await file.readFile()).toString("utf8");
         console.log(`Template file read`);
@@ -146,7 +146,7 @@ export class fileCreator {
             finalData += split2[0]; // adding template part 1
             for (let detectedFile of this.detectedNewFiles) {
                 const basePath = (this.obsVault.adapter as any).basePath;
-                const pathOfFile: string = basePath + `\\` + detectedFile.path;
+                const pathOfFile: string = path.join(basePath, detectedFile.path);
                 const modDate: Date = await getModificationDate(pathOfFile);
                 finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name}]]\n`; // adding files paths
             }
@@ -171,7 +171,7 @@ export class fileCreator {
             finalData += split2[0]; // adding template part 2
             for (let detectedFile of this.detectedNewFiles) {
                 const basePath = (this.obsVault.adapter as any).basePath;
-                const pathOfFile: string = basePath + `\\` + detectedFile.path;
+                const pathOfFile: string = path.join(basePath, detectedFile.path);
                 const modDate: Date = await getModificationDate(pathOfFile);
                 finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name}]]\n`; // adding file paths
             }
@@ -188,7 +188,7 @@ export class fileCreator {
     // fourth to go, this writes the news file
     async writeNewsFile() {
         const basePath = (this.obsVault.adapter as any).basePath;
-        const finalSavePath: string = basePath + `\\` + this.pSettings.newsFilename;
+        const finalSavePath: string = path.join(basePath, this.pSettings.newsFilename);
 
         console.log(`Writing news file... Path :\n ${finalSavePath}`);
         const data = new Uint8Array(Buffer.from(this.newsData));
