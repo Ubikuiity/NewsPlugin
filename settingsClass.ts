@@ -101,8 +101,8 @@ export class SettingsMenu extends PluginSettingTab {
                 // This part opens the template file used for news
                 const basePath = (this.plugin.app.vault.adapter as any).basePath;
                 // TODO this must be changed to support other OS
-                const tempFile = basePath + `\\.obsidian\\plugins\\FirstPlugin\\Ressources\\NewsTemplate.md`;
-                exec(`start notepad++ ${tempFile}`);
+                const tempFile = basePath + `\\.obsidian\\plugins\\${this.plugin.manifest.id}\\Ressources\\NewsTemplate.md`;
+                exec(`start notepad++ "${tempFile}"`);
             });
         });
 
@@ -112,7 +112,7 @@ export class SettingsMenu extends PluginSettingTab {
         this.specialPathsContainer.createEl("h1", { text: "Special pathes" });
         this.specialPathsContainer.createEl("div", { text: "This is the part that handle special paths that will be dismissed when searching for news." });
 		
-		// 
+		// Part with the button to create special pathes
 		const pathsSetting = new Setting(this.specialPathsContainer);
 		pathsSetting.setDesc('Description on how to add pathes should be here');
         pathsSetting.addButton((button: ButtonComponent) => {
