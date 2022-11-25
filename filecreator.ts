@@ -11,12 +11,14 @@ export class fileCreator {
     mainPlugin: NewsPlugin
     obsVault: Vault;
     pSettings: Settings;
-    pluginName: string;
+
     detectedNewFiles: Array<TFile> = [];
     markedNewFiles: Array<TFile> = [];
-    pointedNewFiles: Array<string> = [];
+    pointedNewFiles: Array<string> = [];  // This contains strings : the links to pointed files [[XXX]]
 
-    templateStructure: string;
+    templateTags: Array<string>;
+    templateSplitedText: Array<string>;
+    
     newsData: string;
 
     /**
@@ -28,8 +30,6 @@ export class fileCreator {
         this.mainPlugin = plugin;
         this.obsVault = plugin.app.vault;
         this.pSettings = plugin.settings;
-        this.pluginName = plugin.manifest.id;
-        console.log("creating class filecreator");
     }
 
     /**
@@ -118,68 +118,40 @@ export class fileCreator {
     // second to go, this reads the template file
     async readTemplateFile() {
         const basePath = (this.obsVault.adapter as any).basePath;
-        const pathOfTemplate: string = path.join(basePath, `.obsidian`, `plugins`, this.pluginName, `Ressources`, `NewsTemplate.md`);
+        const pathOfTemplate: string = path.join(basePath, `.obsidian`, `plugins`, this.mainPlugin.manifest.id, `Ressources`, `NewsTemplate.md`);
         const file = await fsp.open(pathOfTemplate);
-        this.templateStructure = (await file.readFile()).toString("utf8");
+        const templateContent = (await file.readFile()).toString("utf8");
         console.log(`Template file read`);
+
+        let remainingText: string = templateContent;
+
+        // Detecting files 
+        let tags: Array<string> = [];
+        let splitedTemplate: Array<string> = [];
+        const tagRegex = new RegExp(`%.News%`, "g");  // Regex used to detect tags in template file
+
+        // Not a very elegant part, but detects differents tags in file and progressively splits the text.
+        let regexMatch: RegExpMatchArray | null;
+        while ((regexMatch = remainingText.match(tagRegex)) !== null) {
+            tags.push(regexMatch[0][1]);
+            const split: string[] = remainingText.split(regexMatch[0]);
+            splitedTemplate.push(split[0]);
+            remainingText = split[1];
+        }
+        splitedTemplate.push(remainingText);
+        console.log(`Found tags ${tags} in template files`);
+
+        this.templateTags = tags;
+        this.templateSplitedText = splitedTemplate;
     }
 
     // third to go, this prepares the data to write in the news file
     async createNewsData() {
-        let finalData: string = ``;
+        let finalData: string = this.templateSplitedText[0];
 
-        // Detecting the marked news tag
-        if (this.templateStructure.includes("%MNews%")) {
-            const split1: string[] = this.templateStructure.split("%MNews%");
-            var part1: string = split1[0];
-            var part2: string = split1[1];
-            // console.log(`First split split1 : ${part1} \n split2 : ${part2}`)
-        }
-        else {
-            throw `Template file doesn't contains the %MNews% tag`;
-        }
-
-        // if part1 contains the detected news tag
-        if (part1.includes("%DNews%")) {
-            const split2: string[] = part1.split("%DNews%");
-            // console.log(`split1 : ${split2[0]} \n split2 : ${split2[1]}`)
-            finalData += split2[0]; // adding template part 1
-            for (let detectedFile of this.detectedNewFiles) {
-                const basePath = (this.obsVault.adapter as any).basePath;
-                const pathOfFile: string = path.join(basePath, detectedFile.path);
-                const modDate: Date = await getModificationDate(pathOfFile);
-                finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name}]]\n`; // adding files paths
-            }
-
-            finalData += split2[1]; // adding template part 2
-            for (let pointedFile of this.pointedNewFiles) {
-                finalData += pointedFile + `\n`; // adding files paths
-            }
-
-            finalData += part2; // adding template part 3 (part 2 of split 1)
-        }
-
-        // if part2 contains the detected news tag
-        else if (part2.includes("%DNews%")) {
-            const split2: string[] = part2.split("%DNews%");
-            // console.log(`split1 : ${split2[0]} \n split2 : ${split2[1]}`)
-            finalData += part1; // adding template part 1
-            for (let pointedFile of this.pointedNewFiles) {
-                finalData += pointedFile + `\n`; // adding files paths
-            }
-
-            finalData += split2[0]; // adding template part 2
-            for (let detectedFile of this.detectedNewFiles) {
-                const basePath = (this.obsVault.adapter as any).basePath;
-                const pathOfFile: string = path.join(basePath, detectedFile.path);
-                const modDate: Date = await getModificationDate(pathOfFile);
-                finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name}]]\n`; // adding file paths
-            }
-            finalData += split2[1]; // adding template part 3
-        }
-
-        else {
-            throw `Template file doesn't contains the %DNews% tag`;
+        for (let tagIndex = 0; tagIndex < this.templateTags.length; tagIndex ++){
+            finalData += await this.getTagNewsData(this.templateTags[tagIndex]);
+            finalData += this.templateSplitedText[tagIndex + 1];
         }
 
         this.newsData = finalData;
@@ -193,6 +165,43 @@ export class fileCreator {
         console.log(`Writing news file... Path :\n ${finalSavePath}`);
         const data = new Uint8Array(Buffer.from(this.newsData));
         await fsp.writeFile(finalSavePath, data);
+    }
+
+    /**
+     * Function that creates the text put instead of %.News% depending on what character takes the place of the '.'
+     * 
+     * @param tag Tag used to specify which news should be displayed here. Tags can be :
+     *  - D : Detected News
+     *  - M : Marked News
+     *  - P : Pointed News
+     * @return string that replaces the %.News%
+     */
+    async getTagNewsData(tag: string): Promise<string> {
+        let finalData: string = '';
+
+        switch (tag){
+            case 'D': // Detected News (this one adds the date to the news)
+                for (let detectedFile of this.detectedNewFiles) {
+                    const basePath = (this.obsVault.adapter as any).basePath;
+                    const pathOfFile: string = path.join(basePath, detectedFile.path);
+                    const modDate: Date = await getModificationDate(pathOfFile);
+                    finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name}]]\n`; // adding files paths
+                }
+                return finalData;
+            case 'M': // Marked news
+                for (let markedFile of this.markedNewFiles) {
+                    finalData += `[[${markedFile.name}]]\n`; // adding files paths
+                }
+                return finalData;
+            case 'P': // Pointed news, bit different function as pointedNewFiles do not have the same format as other newsFile Array
+                for (let pointedFile of this.pointedNewFiles) {
+                    finalData += pointedFile + `\n`; // adding files paths
+                }
+                return finalData;
+            default:
+                console.log(`Unexpected tag found : ${tag}`);
+                return finalData;
+        }
     }
 }
 

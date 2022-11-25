@@ -3,7 +3,7 @@
 Marked News
 ---
 
-%MNews%
+%PNews%
 
 Detected News
 ---
