@@ -15,6 +15,7 @@ export class fileCreator {
     detectedNewFiles: Array<TFile> = [];
     markedNewFiles: Array<TFile> = [];
     pointedNewFiles: Array<string> = [];  // This contains strings : the links to pointed files [[XXX]]
+    pointerToNewFiles: Array<TFile> = [];
 
     templateTags: Array<string>;
     templateSplitedText: Array<string>;
@@ -44,14 +45,15 @@ export class fileCreator {
         await this.writeNewsFile();
     }
 
-    // first to go, Refresh the files detected and marked as new
+    // first to go, Refresh the files detected, marked and pointed as new
     async refreshNews() {
         console.log(`refreshing files detected and marked ...`);
 
-        // Reseting new files
+        // Reseting new files arrays
         this.detectedNewFiles = [];
         this.markedNewFiles = [];
         this.pointedNewFiles = [];
+        this.pointerToNewFiles = [];
 
         const basePath = (this.obsVault.adapter as any).basePath;
         const files = this.obsVault.getMarkdownFiles();
@@ -60,47 +62,43 @@ export class fileCreator {
         for (let mdFile of files) {
             const fPath: string = mdFile.path;
             if (checkIsNotSpecialPath(fPath, this.pSettings.specialPaths)){
-                const pathOfFile: string = path.join(basePath, fPath);
-                const modDate: Date = await getModificationDate(pathOfFile);
+
+                // This part detects if the file has been modified recently
                 const now: Date = new Date();
-                // Checking if date of modification is recent
-                if (now.getTime() - modDate.getTime() < this.pSettings.newsDelay * 24 * 60 * 60 * 1000) {
-                    // console.log(`File ${fPath} is recent`);
+                if (now.getTime() - mdFile.stat.mtime < this.pSettings.detectNewsDelay * 24 * 60 * 60 * 1000) {
                     this.detectedNewFiles.push(mdFile);
                 }
 
+                // This part detects if file is marked as new
+                if (mdFile.name.includes(this.pSettings.newsLogo)){
+                    this.markedNewFiles.push(mdFile);
+                }
+
+                // This part detects new pointed files
                 const content: string = await this.obsVault.cachedRead(mdFile);
 
-                // This part detects marked and pointed files
                 if (content.includes(this.pSettings.newsLogo)) {
-                    const pathMarkedFile: string = path.join(basePath, fPath);
-                    const file = await fsp.open(pathMarkedFile);
-                    const data = (await file.readFile()).toString("utf8");
-
                     // looking for links marked as new in the file
-                    const rePattern = new RegExp(`\\[{2}.*${this.pSettings.newsLogo}`, "g"); // Regex pattern
-                    const matches = data.matchAll(rePattern);
-                    for (const match of matches) {
+                    const rePattern = new RegExp(`\\[{2}.*${this.pSettings.newsLogo}|${this.pSettings.newsLogo}.*\\]{2}`, "g");
+                    const matches = content.matchAll(rePattern);
+                    for (let match of matches) {
                         const matchString: string = match[0];
-                        // console.log(`Found \n ${matchString}`);
-                        const rePattern2 = new RegExp(`\\[{2}.*\\]{2}`, "g");
+
+                        const rePattern2 = new RegExp(`\\[{2}.*\\]{2}`, "g"); // Regex to get only the link to file
                         const match2 = matchString.match(rePattern2);
                         if (match2) {
                             const newFileLink: string = match2[0];
                             this.pointedNewFiles.push(newFileLink);
                         }
                     }
-                    this.markedNewFiles.push(mdFile);
+                    this.pointerToNewFiles.push(mdFile);
                 }
             }
         }
 
         // sort detected files by creation date (most recent are the first of the list)
-
         const sortableArray = await Promise.all(this.detectedNewFiles.map(async (file: TFile) => {
-            const fPath: string = path.join(basePath, file.path);
-            const fDate: Date = await getModificationDate(fPath);
-            return [fDate.getTime(), file];
+            return [file.stat.mtime, file]
         }));
 
         sortableArray.sort((a, b) => {
@@ -112,7 +110,8 @@ export class fileCreator {
         console.log(`Found new files :
         Detected files : ${this.detectedNewFiles.length}
         Marked files : ${this.markedNewFiles.length}
-        Pointed Files : ${this.pointedNewFiles.length}`);
+        Pointed Files : ${this.pointedNewFiles.length}
+        Pointer Files : ${this.pointerToNewFiles.length}`);
     }
 
     // second to go, this reads the template file
@@ -184,13 +183,13 @@ export class fileCreator {
                 for (let detectedFile of this.detectedNewFiles) {
                     const basePath = (this.obsVault.adapter as any).basePath;
                     const pathOfFile: string = path.join(basePath, detectedFile.path);
-                    const modDate: Date = await getModificationDate(pathOfFile);
-                    finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name}]]\n`; // adding files paths
+                    const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
+                    finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name.split('.')[0]}]]\n`; // adding files paths
                 }
                 return finalData;
             case 'M': // Marked news
                 for (let markedFile of this.markedNewFiles) {
-                    finalData += `[[${markedFile.name}]]\n`; // adding files paths
+                    finalData += `[[${markedFile.name.split('.')[0]}]]\n`; // adding files paths
                 }
                 return finalData;
             case 'P': // Pointed news, bit different function as pointedNewFiles do not have the same format as other newsFile Array
@@ -204,7 +203,6 @@ export class fileCreator {
         }
     }
 }
-
 
 
 /**
@@ -224,11 +222,4 @@ function checkIsNotSpecialPath(path: string, specialPathes: Array<string>): bool
         }
     }
     return true;
-}
-
-
-// Function that gets last modification date of file
-async function getModificationDate(pathToExplore: string): Promise<Date> {
-    const stats: Stats = await fsp.stat(pathToExplore);
-    return stats.mtime;
 }

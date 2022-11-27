@@ -7,14 +7,16 @@ import { platform } from 'process';
 
 export interface Settings {
 	newsLogo: string;
-	newsDelay: number;
+	detectNewsDelay: number;
+	rmNewsDelay: number;
 	newsFilename: string;
 	specialPaths: Array<string>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
 	newsLogo: '🆕',
-	newsDelay: 7,
+	detectNewsDelay: 7,
+	rmNewsDelay: 15,
 	newsFilename: 'News.md',
 	specialPaths: ['News.md']
 }
@@ -47,19 +49,34 @@ export class SettingsMenu extends PluginSettingTab {
 					})
 			)
 
-		// Setting for the news delay
+		// Setting for the auto-detected news delay
 		new Setting(containerEl)
-			.setName("News delay")
-			.setDesc("Time before considering an article 'not new anymore' (in days)")
+			.setName("Detect news delay")
+			.setDesc(`Time used to detect news articles (in days), if an article had been modified before this delay, 
+					it will appear as new`)
 			.addText((text) =>
 				text
 					.setPlaceholder("number of days")
-					.setValue(this.plugin.settings.newsDelay.toString())
+					.setValue(this.plugin.settings.detectNewsDelay.toString())
 					.onChange(async (value) => {
-						this.plugin.settings.newsDelay = Number(value);
+						this.plugin.settings.detectNewsDelay = Number(value);
 						await this.plugin.saveSettings();
 					})
 			)
+		
+		// Setting for the removal delay of old news
+		new Setting(containerEl)
+		.setName("removal of old news")
+		.setDesc("Time before considering an article 'not new anymore' and remove the symbol marking it")
+		.addText((text) =>
+			text
+				.setPlaceholder("number of days")
+				.setValue(this.plugin.settings.rmNewsDelay.toString())
+				.onChange(async (value) => {
+					this.plugin.settings.rmNewsDelay = Number(value);
+					await this.plugin.saveSettings();
+				})
+		)
 		
 		// Setting for the news file name
 		new Setting(containerEl)
@@ -71,7 +88,6 @@ export class SettingsMenu extends PluginSettingTab {
 					.setValue(this.plugin.settings.newsFilename.toString())
 					.onChange(async (value) => {
 						const basePath: string = (this.plugin.app.vault.adapter as any).basePath;
-						const oldFilePath: string = path.join(basePath, this.plugin.settings.newsFilename);
 						// Checks if the file already contains '.md', append it to the end otherwise
 						if (value.contains(`.`)) {
 							value = value.split(`.`)[0] + `.md`; // This makes sure that file name ends with .md
@@ -79,6 +95,9 @@ export class SettingsMenu extends PluginSettingTab {
 						else {
 							value = value + `.md`;
 						}
+						// keep old file name in memory, we will need it to rename the file
+						const oldFilePath: string = path.join(basePath, this.plugin.settings.newsFilename);
+
 						this.plugin.settings.newsFilename = value;
 						const newFilePath: string =  path.join(basePath, value);
 						try {

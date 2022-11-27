@@ -1,10 +1,13 @@
 import { addIcon, Notice, Plugin } from 'obsidian';
 import { fileCreator } from "filecreator";
-import { newIc, newSyncIc } from "icons";
+import { newsCleaner } from "newsCleaner";
+import { newSyncIc } from "icons";
 import { SettingsMenu, Settings, DEFAULT_SETTINGS } from 'settingsClass';
 
 export default class NewsPlugin extends Plugin {
 	settings: Settings;
+	pageCreator: fileCreator;
+	fileCleaner: newsCleaner;
 
 	// Executed when Plugin starts (Obsidian opens)
 	async onload() {
@@ -12,7 +15,10 @@ export default class NewsPlugin extends Plugin {
 		await this.loadSettings();
 
 		//Create the news page creator class, this is a custom class
-		const pageCreator = new fileCreator(this);
+		this.pageCreator = new fileCreator(this);
+
+		// Create the file cleaner
+		this.fileCleaner = new newsCleaner(this);
 
 		// This calls the menu where the user can change the parameters
 		this.addSettingTab(new SettingsMenu(this.app, this));
@@ -22,8 +28,13 @@ export default class NewsPlugin extends Plugin {
 
 		// This part creates the ribbon Icon to display the news view
 		const ribbonNewsSyncIcon = this.addRibbonIcon('NewSynchro', 'News Synchro', (evt: MouseEvent) => {
-			pageCreator.synchroAll();
+			this.pageCreator.synchroAll();
 			new Notice(`reloading news page, please don't spam this button`);
+		});
+
+		const ribbonNewsCleanerIcon = this.addRibbonIcon('dice', 'News Cleaner', (evt: MouseEvent) => {
+			this.fileCleaner.clearNews();
+			new Notice(`Cleaning News, this can take some time ... don't spam this button`);
 		});
 	}
 
