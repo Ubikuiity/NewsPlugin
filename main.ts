@@ -31,11 +31,6 @@ export default class NewsPlugin extends Plugin {
 			this.pageCreator.synchroAll();
 			new Notice(`reloading news page, please don't spam this button`);
 		});
-
-		const ribbonNewsCleanerIcon = this.addRibbonIcon('dice', 'News Cleaner', (evt: MouseEvent) => {
-			this.fileCleaner.clearNews();
-			new Notice(`Cleaning News, this can take some time ... don't spam this button`);
-		});
 	}
 
 	onunload() {

@@ -125,7 +125,22 @@ export class SettingsMenu extends PluginSettingTab {
                 
 				// This is the part that needs to me modified to support multiples OS
 				if (platform == 'win32'){exec(`start notepad++ "${tempFile}"`)}
-				else if (platform == 'linux'){exec(`gedit "${tempFile}"`)};
+				else if (platform == 'linux'){exec(`gedit "${tempFile}"`)}
+				else {
+					console.warn('OS not supported, cannot open template file')
+				}
+            });
+        });
+
+		// Creates a button to clean up the News marker that are not relevant anymore
+        const cleanupSetting = new Setting(containerEl)
+        cleanupSetting.setDesc(`Use this button to clean up news marker that are not relevant anymore.
+		Be careful when using this button, some files will be modified and some file name can change.`);
+        cleanupSetting.addButton((button: ButtonComponent) => {
+            button.setClass('cleanupButton');
+            button.setButtonText('Clean Vault');
+            button.onClick(() => {
+                this.plugin.fileCleaner.clearNews();
             });
         });
 
@@ -165,7 +180,9 @@ export class SettingsMenu extends PluginSettingTab {
 	 * @param initialValue (optional) : string = ''. This is the initial value of the special path. default value is empty string
 	 */
 	addSpecialPath(listIndex: number, initialValue: string = '') {
-		console.log(`Adding new special path in setting`);
+		if (initialValue == '') {
+			console.log(`Adding new special path in setting`);
+		}
 		// Creates the HTML element, this is required as we need something removable, and I can't find a way to remove settings
 		const pathHTMLElement: HTMLElement = this.specialPathsContainer.createEl("div");
 		new Setting(pathHTMLElement)  // Creates the setting in the HTML element
@@ -191,8 +208,6 @@ export class SettingsMenu extends PluginSettingTab {
 	}
 
 	async createSpePathsFromArray(){
-		console.log(`Creating special pathes from list : ${this.plugin.settings.specialPaths}`)
-
 		// We must get list lenght before looping as the list lenght will change will iterating
 		const pathesLenght = this.plugin.settings.specialPaths.length;
 
@@ -211,6 +226,5 @@ export class SettingsMenu extends PluginSettingTab {
 			}
 		}
 		await this.plugin.saveSettings();
-		console.log(`finished creating paths from array`);
 	}
 }
