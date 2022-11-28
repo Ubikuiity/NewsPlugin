@@ -113,8 +113,7 @@ export class SettingsMenu extends PluginSettingTab {
         // Creates a button for editing the template file with Notepad++
         const templateSetting = new Setting(containerEl)
         templateSetting.setDesc(`Use this button to edit the template file used to create the News file.
-            You must use the %MNews% and %DNews% respectively for the marked news and detected news locations.\n\n
-			This requires notepad++ on Windows or gedit on Linux`);
+            You can use the %PNews%, %MNews% and %DNews% respectively for the pointed news, marked news and detected news.`);
         templateSetting.addButton((button: ButtonComponent) => {
             button.setClass('templateButton');
             button.setButtonText('Template File');
@@ -124,11 +123,7 @@ export class SettingsMenu extends PluginSettingTab {
                 const tempFile = path.join(basePath, '.obsidian', 'plugins', this.plugin.manifest.id, 'Ressources', 'NewsTemplate.md');
                 
 				// This is the part that needs to me modified to support multiples OS
-				if (platform == 'win32'){exec(`start notepad++ "${tempFile}"`)}
-				else if (platform == 'linux'){exec(`gedit "${tempFile}"`)}
-				else {
-					console.warn('OS not supported, cannot open template file')
-				}
+				exec(`${getCommandLine()} "${tempFile}"`);
             });
         });
 
@@ -159,12 +154,6 @@ export class SettingsMenu extends PluginSettingTab {
 			button.onClick((evt: MouseEvent) => {
 				// This function handles all the subparts (one part per path)
 				this.plugin.settings.specialPaths.push('');  // Create the new value the plugin will write into
-
-				let count = 0;
-				for(let specialPath of this.plugin.settings.specialPaths){
-					count ++;
-				}
-
 				this.addSpecialPath(this.plugin.settings.specialPaths.length - 1);
 			});
         });
@@ -226,5 +215,16 @@ export class SettingsMenu extends PluginSettingTab {
 			}
 		}
 		await this.plugin.saveSettings();
+	}
+}
+
+/**
+ * Function used to get the correct cmd to open file with default editor
+ */
+function getCommandLine(): string{
+	switch (process.platform) { 
+		case 'darwin' : return 'open';
+		case 'win32' : return 'start /b ""';
+		default : return 'xdg-open';
 	}
 }
