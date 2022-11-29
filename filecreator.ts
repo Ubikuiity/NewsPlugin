@@ -14,7 +14,7 @@ export class fileCreator {
 
     detectedNewFiles: Array<TFile> = [];
     markedNewFiles: Array<TFile> = [];
-    pointedNewFiles: Array<string> = [];  // This contains strings : the links to pointed files [[XXX]]
+    pointedNewFiles: Array<(TFile | string)[]> = [];  // This array contains arrays : the pointed file, the link to the pointed file and the file that contains the link
     pointerToNewFiles: Array<TFile> = [];
 
     templateTags: Array<string>;
@@ -23,7 +23,7 @@ export class fileCreator {
     newsData: string;
 
     /**
-     * Class qui construit le fichier News
+     * Class used to contruct the 
      * 
      * @param plugin Main plugin
      */
@@ -45,7 +45,10 @@ export class fileCreator {
         await this.writeNewsFile();
     }
 
-    // first to go, Refresh the files detected, marked and pointed as new
+    /**
+     * This function refreshes the members detectedNewFiles, markedNewFiles, pointedNewFiles and pointerToNewFiles
+     * by going through all the files and looking all news. This function can be quite expensive for big vaults
+     */
     async refreshNews() {
         console.log(`refreshing files detected and marked ...`);
 
@@ -74,7 +77,7 @@ export class fileCreator {
                     this.markedNewFiles.push(mdFile);
                 }
 
-                // This part detects new pointed files
+                // This part detects new pointed files by looking for links marked as new in the file
                 const content: string = await this.obsVault.cachedRead(mdFile);
 
                 if (content.includes(this.pSettings.newsLogo)) {
@@ -88,7 +91,16 @@ export class fileCreator {
                         const match2 = matchString.match(rePattern2);
                         if (match2) {
                             const newFileLink: string = match2[0];
-                            this.pointedNewFiles.push(newFileLink);
+                            const fileName: string = getFileNameFromLink(newFileLink);
+                            let file;
+                            if ((file = this.getFileFromName(fileName)) != null) {
+                                this.pointedNewFiles.push([file, newFileLink, mdFile]);
+                            }
+                            else{
+                                console.warn(`Error trying to retrieve modification date from file Link ${newFileLink}.\n` +
+                                        `Search for file '${fileName}' didn't succeed.\n` +
+                                        `Check that file name doesn't contain a '.'`);
+                            }
                         }
                     }
                     this.pointerToNewFiles.push(mdFile);
@@ -96,16 +108,24 @@ export class fileCreator {
             }
         }
 
-        // sort detected files by creation date (most recent are the first of the list)
-        const sortableArray = await Promise.all(this.detectedNewFiles.map(async (file: TFile) => {
+        // Now sorting arrays by modification date (most recent are the first of the list)
+        // Sorting Pointed files (links)
+
+        const pointedSortableArray = await Promise.all(this.pointedNewFiles.map(async (element: (string | TFile)[]) => {
+            
+        }));
+
+
+        // Sorting Detected files
+        const detectedSortableArray = await Promise.all(this.detectedNewFiles.map(async (file: TFile) => {
             return [file.stat.mtime, file]
         }));
 
-        sortableArray.sort((a, b) => {
+        detectedSortableArray.sort((a, b) => {
             return -(a[0] > b[0]) || +(a[0] < b[0]);
         })
 
-        this.detectedNewFiles = sortableArray.map(x => x[1]) as Array<TFile>;
+        this.detectedNewFiles = detectedSortableArray.map(x => x[1]) as Array<TFile>;
 
         console.log(`Found new files :
         Detected files : ${this.detectedNewFiles.length}
@@ -177,11 +197,11 @@ export class fileCreator {
      */
     async getTagNewsData(tag: string): Promise<string> {
         let finalData: string = '';
+        const basePath = (this.obsVault.adapter as any).basePath;
 
         switch (tag){
             case 'D': // Detected News (this one adds the date to the news)
                 for (let detectedFile of this.detectedNewFiles) {
-                    const basePath = (this.obsVault.adapter as any).basePath;
                     const pathOfFile: string = path.join(basePath, detectedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
                     finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name.split('.')[0]}]]\n`; // adding files paths
@@ -189,18 +209,32 @@ export class fileCreator {
                 return finalData;
             case 'M': // Marked news
                 for (let markedFile of this.markedNewFiles) {
-                    finalData += `[[${markedFile.name.split('.')[0]}]]\n`; // adding files paths
+                    const pathOfFile: string = path.join(basePath, markedFile.path);
+                    const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
+                    finalData += `${modDate.toString().split("GMT")[0]} : [[${markedFile.name.split('.')[0]}]]\n`; // adding files paths
                 }
                 return finalData;
             case 'P': // Pointed news, bit different function as pointedNewFiles do not have the same format as other newsFile Array
                 for (let pointedFile of this.pointedNewFiles) {
-                    finalData += pointedFile + `\n`; // adding files paths
+                    const pathOfFile: string = path.join(basePath, (pointedFile[0] as TFile).path);
+                    const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
+                    finalData += `${modDate.toString().split("GMT")[0]} : ${pointedFile[1]}\n`; // adding files paths
                 }
                 return finalData;
             default:
                 console.log(`Unexpected tag found : ${tag}`);
                 return finalData;
         }
+    }
+
+    getFileFromName(nameOfFile: string): TFile | null{
+        for (let mdFile of this.obsVault.getMarkdownFiles()){
+            const nameOfMdFile = mdFile.name.slice(0, mdFile.name.lastIndexOf('.'));  // Removes the .md at the end of the name
+            if (nameOfMdFile == nameOfFile){
+                return mdFile
+            }
+        }
+        return null;
     }
 }
 
@@ -222,4 +256,17 @@ function checkIsNotSpecialPath(path: string, specialPathes: Array<string>): bool
         }
     }
     return true;
+}
+
+function getFileNameFromLink(fileLink: string): string{
+    let res: string = fileLink;
+    res = res.replace(/[\[\]]/g, '');
+    // [[XXX/XXX/Y|I like this file]] -> XXX/XXX/Y|I like this file
+    res = res.split('|')[0];
+    // XXX/XXX/Y|I like this file -> XXX/XXX/Y
+    res = res.split('/').pop() as string;
+    // XXX/XXX/Y -> Y
+    res = res.split(`\\`).pop() as string;
+    // Y -> Y  (Has no effect here, but useful if there are some \ in the path)
+    return res
 }
