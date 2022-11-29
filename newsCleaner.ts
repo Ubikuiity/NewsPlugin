@@ -26,13 +26,12 @@ export class newsCleaner {
         await fCreator.refreshNews(); // This line makes sure files detected as new are up to date
 
         const basePath = (this.obsVault.adapter as any).basePath;
+        const now: Date = new Date();
 
         let count: number = 0;
         // Handle marked new files
         for (let mdFile of fCreator.markedNewFiles){
             const modDate = mdFile.stat.mtime;
-            const now: Date = new Date();
-            now.getTime() - modDate
             if (now.getTime() - modDate > this.pSettings.rmNewsDelay * 24 * 60 * 60 * 1000){  // if file is not new anymore
                 const rePattern: RegExp = new RegExp(` *${this.pSettings.newsLogo} *`, "g");  // Regex to find news icon and spaces around it
                 const newName: string = mdFile.name.replace(rePattern, '');
@@ -75,7 +74,6 @@ export class newsCleaner {
 
                     let file;
                     if ((file = this.getFileFromName(fileName)) != null){  // Checking if we can find file
-                        const now: Date = new Date();
                         if (now.getTime() - file.stat.mtime > this.pSettings.rmNewsDelay * 24 * 60 * 60 * 1000){
                             const logoRegex  = new RegExp(` *${this.pSettings.newsLogo} *`, 'g');  // This regex only gets the news logo and spaces around it
                             for (let logoMatch of match[0].matchAll(logoRegex)){
@@ -102,8 +100,13 @@ export class newsCleaner {
 
             if (shift > 0){
                 // If we remove more than 0 element, rewrite the file
+                const lastModificationDate = pointerFile.stat.mtime; // Keep modification date in memory
+                const fullPathFile: string = path.join(basePath, pointerFile.path);
                 const data = new Uint8Array(Buffer.from(content));
-                await fsp.writeFile(path.join(basePath, pointerFile.path), data);
+                await fsp.writeFile(fullPathFile, data);
+
+                // Change modification date to put it back as it was before changing the file
+                await fsp.utimes(fullPathFile, now, new Date(lastModificationDate));
                 count ++;
             }
         }
