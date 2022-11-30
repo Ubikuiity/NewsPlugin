@@ -28,8 +28,8 @@ export class newsCleaner {
         const basePath = (this.obsVault.adapter as any).basePath;
         const now: Date = new Date();
 
-        let count: number = 0;
         // Handle marked new files
+        let count: number = 0;
         for (let mdFile of fCreator.markedNewFiles){
             const modDate = mdFile.stat.mtime;
             if (now.getTime() - modDate > this.pSettings.rmNewsDelay * 24 * 60 * 60 * 1000){  // if file is not new anymore

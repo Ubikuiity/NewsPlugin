@@ -143,11 +143,12 @@ export class SettingsMenu extends PluginSettingTab {
 		// This part handles the top part
         this.specialPathsContainer = containerEl.createEl("div");
         this.specialPathsContainer.createEl("h1", { text: "Special pathes" });
-        this.specialPathsContainer.createEl("div", { text: "This is the part that handle special paths that will be dismissed when searching for news." });
+        this.specialPathsContainer.createEl("div", { text: "This is the part that handle special paths that will be passed over when searching for news." });
 		
 		// Part with the button to create special pathes
 		const pathsSetting = new Setting(this.specialPathsContainer);
-		pathsSetting.setDesc('Description on how to add pathes should be here');
+		pathsSetting.setDesc('You can add special pathes here.' +
+					`If a file path in the vault contains one of the special pathes given here, he will be passed over when looking for news`);
         pathsSetting.addButton((button: ButtonComponent) => {
             button.setClass('addSpecialPathButton');
             button.setIcon('plus-with-circle');
@@ -204,7 +205,6 @@ export class SettingsMenu extends PluginSettingTab {
 		// Looping through all values to only get non null values, i is a basic index, count is the list index
 		for(let i=0; i < pathesLenght; i++){
 			const specialPath = this.plugin.settings.specialPaths[count]
-			// console.log(`creating menu : index ${count}, value : ${specialPath}`);
 			if (specialPath == ''){
 				this.plugin.settings.specialPaths.splice(count, 1);  // removes value from array
 				// Do not increase index
@@ -222,7 +222,7 @@ export class SettingsMenu extends PluginSettingTab {
  * Function used to get the correct cmd to open file with default editor
  */
 function getCommandLine(): string{
-	switch (process.platform) { 
+	switch (platform) { 
 		case 'darwin' : return 'open';
 		case 'win32' : return 'start /b ""';
 		default : return 'xdg-open';

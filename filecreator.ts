@@ -1,6 +1,5 @@
 // Class used to create news file
 import { Vault, TFile } from "obsidian";
-import { Stats } from "fs";
 import * as fsp from 'fs/promises';
 import { Settings } from "settingsClass";
 import NewsPlugin from "main";
@@ -24,7 +23,6 @@ export class fileLink {
         this.linkString = linkString;
         this.originalFile = oFile;
     }
-
 }
 
 export class fileCreator {
@@ -35,7 +33,7 @@ export class fileCreator {
 
     detectedNewFiles: Array<TFile> = [];
     markedNewFiles: Array<TFile> = [];
-    pointedNewFiles: Array<fileLink> = [];  // This array contains arrays : the pointed file, the link to the pointed file and the file that contains the link
+    pointedNewFiles: Array<fileLink> = [];
     pointerToNewFiles: Array<TFile> = [];
 
     templateTags: Array<string>;
@@ -44,7 +42,7 @@ export class fileCreator {
     newsData: string;
 
     /**
-     * Class used to contruct the 
+     * Class used to contruct the news file.
      * 
      * @param plugin Main plugin
      */
@@ -117,9 +115,8 @@ export class fileCreator {
                                 this.pointedNewFiles.push(new fileLink(file, newFileLink, mdFile));
                             }
                             else{
-                                console.warn(`Error trying to retrieve modification date from file Link ${newFileLink}.\n` +
-                                        `Search for file '${fileName}' didn't succeed.\n` +
-                                        `Check that file name doesn't contain a '.'`);
+                                console.warn(`Error while reading ${newFileLink}.\n` +
+                                        `Search for file '${fileName}' didn't succeed.\n`);
                             }
                         }
                     }
