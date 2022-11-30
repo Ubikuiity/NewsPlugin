@@ -6,15 +6,36 @@ import { Settings } from "settingsClass";
 import NewsPlugin from "main";
 import * as path from "path";
 
+// This interface is needed to represent a link in a file
+export class fileLink {
+    pointedFile: TFile;  // The file being linked
+    linkString: string;  // The string that contains the link to the file
+    originalFile: TFile;  // The file containing the link
+
+    /**
+     * Class used to contruct the link object
+     * 
+     * @param pFile file being pointed by the link
+     * @param linkString string of the link [[XXXXX]]
+     * @param oFile file containing the link
+     */
+     constructor(pFile: TFile, linkString: string, oFile: TFile) {
+        this.pointedFile = pFile;
+        this.linkString = linkString;
+        this.originalFile = oFile;
+    }
+
+}
+
 export class fileCreator {
 
-    mainPlugin: NewsPlugin
+    mainPlugin: NewsPlugin;
     obsVault: Vault;
     pSettings: Settings;
 
     detectedNewFiles: Array<TFile> = [];
     markedNewFiles: Array<TFile> = [];
-    pointedNewFiles: Array<(TFile | string)[]> = [];  // This array contains arrays : the pointed file, the link to the pointed file and the file that contains the link
+    pointedNewFiles: Array<fileLink> = [];  // This array contains arrays : the pointed file, the link to the pointed file and the file that contains the link
     pointerToNewFiles: Array<TFile> = [];
 
     templateTags: Array<string>;
@@ -58,7 +79,6 @@ export class fileCreator {
         this.pointedNewFiles = [];
         this.pointerToNewFiles = [];
 
-        const basePath = (this.obsVault.adapter as any).basePath;
         const files = this.obsVault.getMarkdownFiles();
 
         // for all markdown files
@@ -94,7 +114,7 @@ export class fileCreator {
                             const fileName: string = getFileNameFromLink(newFileLink);
                             let file;
                             if ((file = this.getFileFromName(fileName)) != null) {
-                                this.pointedNewFiles.push([file, newFileLink, mdFile]);
+                                this.pointedNewFiles.push(new fileLink(file, newFileLink, mdFile));
                             }
                             else{
                                 console.warn(`Error trying to retrieve modification date from file Link ${newFileLink}.\n` +
@@ -111,10 +131,15 @@ export class fileCreator {
         // Now sorting arrays by modification date (most recent are the first of the list)
         // Sorting Pointed files (links)
 
-        const pointedSortableArray = await Promise.all(this.pointedNewFiles.map(async (element: (string | TFile)[]) => {
-            
+        const pointedSortableArray = await Promise.all(this.pointedNewFiles.map(async (link: fileLink) => {
+            return [link.pointedFile.stat.mtime, link]
         }));
 
+        pointedSortableArray.sort((a, b) => {
+            return -(a[0] > b[0]) || +(a[0] < b[0]);
+        })
+
+        this.pointedNewFiles = pointedSortableArray.map(x => x[1]) as Array<fileLink>;
 
         // Sorting Detected files
         const detectedSortableArray = await Promise.all(this.detectedNewFiles.map(async (file: TFile) => {
@@ -204,21 +229,21 @@ export class fileCreator {
                 for (let detectedFile of this.detectedNewFiles) {
                     const pathOfFile: string = path.join(basePath, detectedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
-                    finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name.split('.')[0]}]]\n`; // adding files paths
+                    finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name.split('.')[0]}]]\r\n`; // adding files paths
                 }
                 return finalData;
             case 'M': // Marked news
                 for (let markedFile of this.markedNewFiles) {
                     const pathOfFile: string = path.join(basePath, markedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
-                    finalData += `${modDate.toString().split("GMT")[0]} : [[${markedFile.name.split('.')[0]}]]\n`; // adding files paths
+                    finalData += `${modDate.toString().split("GMT")[0]} : [[${markedFile.name.split('.')[0]}]]\r\n`; // adding files paths
                 }
                 return finalData;
             case 'P': // Pointed news, bit different function as pointedNewFiles do not have the same format as other newsFile Array
-                for (let pointedFile of this.pointedNewFiles) {
-                    const pathOfFile: string = path.join(basePath, (pointedFile[0] as TFile).path);
+                for (let pointedLink of this.pointedNewFiles) {
+                    const pathOfFile: string = path.join(basePath, pointedLink.pointedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
-                    finalData += `${modDate.toString().split("GMT")[0]} : ${pointedFile[1]}\n`; // adding files paths
+                    finalData += `${modDate.toString().split("GMT")[0]} : ${pointedLink.linkString}\r\n`; // adding files paths
                 }
                 return finalData;
             default:
