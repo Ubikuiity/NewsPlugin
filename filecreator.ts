@@ -100,7 +100,7 @@ export class fileCreator {
 
                 if (content.includes(this.pSettings.newsLogo)) {
                     // looking for links marked as new in the file
-                    const rePattern = new RegExp(`\\[{2}.*${this.pSettings.newsLogo}|${this.pSettings.newsLogo}.*\\]{2}`, "g");
+                    const rePattern = new RegExp(`\\[{2}.*\\]{2}.*${this.pSettings.newsLogo}|${this.pSettings.newsLogo}.*\\[{2}.*\\]{2}`, "g");
                     const matches = content.matchAll(rePattern);
                     for (let match of matches) {
                         const matchString: string = match[0];
@@ -128,9 +128,9 @@ export class fileCreator {
         // Now sorting arrays by modification date (most recent are the first of the list)
         // Sorting Pointed files (links)
 
-        const pointedSortableArray = await Promise.all(this.pointedNewFiles.map(async (link: fileLink) => {
+        const pointedSortableArray = this.pointedNewFiles.map((link: fileLink) => {
             return [link.pointedFile.stat.mtime, link]
-        }));
+        });
 
         pointedSortableArray.sort((a, b) => {
             return -(a[0] > b[0]) || +(a[0] < b[0]);
@@ -139,9 +139,9 @@ export class fileCreator {
         this.pointedNewFiles = pointedSortableArray.map(x => x[1]) as Array<fileLink>;
 
         // Sorting Detected files
-        const detectedSortableArray = await Promise.all(this.detectedNewFiles.map(async (file: TFile) => {
+        const detectedSortableArray = this.detectedNewFiles.map((file: TFile) => {
             return [file.stat.mtime, file]
-        }));
+        });
 
         detectedSortableArray.sort((a, b) => {
             return -(a[0] > b[0]) || +(a[0] < b[0]);
@@ -226,21 +226,21 @@ export class fileCreator {
                 for (let detectedFile of this.detectedNewFiles) {
                     const pathOfFile: string = path.join(basePath, detectedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
-                    finalData += `${modDate.toString().split("GMT")[0]} : [[${detectedFile.name.split('.')[0]}]]\r\n`; // adding files paths
+                    finalData += `${this.chooseDateFormat(modDate)}[[${detectedFile.name.split('.')[0]}]]\r\n`; // adding files paths
                 }
                 return finalData;
             case 'M': // Marked news
                 for (let markedFile of this.markedNewFiles) {
                     const pathOfFile: string = path.join(basePath, markedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
-                    finalData += `${modDate.toString().split("GMT")[0]} : [[${markedFile.name.split('.')[0]}]]\r\n`; // adding files paths
+                    finalData += `${this.chooseDateFormat(modDate)}[[${markedFile.name.split('.')[0]}]]\r\n`; // adding files paths
                 }
                 return finalData;
             case 'P': // Pointed news, bit different function as pointedNewFiles do not have the same format as other newsFile Array
                 for (let pointedLink of this.pointedNewFiles) {
                     const pathOfFile: string = path.join(basePath, pointedLink.pointedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
-                    finalData += `${modDate.toString().split("GMT")[0]} : ${pointedLink.linkString}\r\n`; // adding files paths
+                    finalData += `${this.chooseDateFormat(modDate)}${pointedLink.linkString}\r\n`; // adding files paths
                 }
                 return finalData;
             default:
@@ -257,6 +257,26 @@ export class fileCreator {
             }
         }
         return null;
+    }
+
+    /**
+     * Change date format according to tag given in parameters of plugin.
+     * 
+     * @param date date to be formatted
+     */
+    chooseDateFormat(date: Date){
+        switch (this.pSettings.dateFormat){
+            case 'N':
+                return '';
+            case 'D':
+                return `${date.toLocaleDateString()} : `;
+            case 'DH':
+                return `${date.toLocaleString()} : `;
+            case 'DOW':
+                return `${date.toString().split('GMT')[0]}: `;
+            default:
+                return '';
+        }
     }
 }
 

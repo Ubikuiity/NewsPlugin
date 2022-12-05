@@ -8,6 +8,7 @@ import { platform } from 'process';
 export interface Settings {
 	newsLogo: string;
 	detectNewsDelay: number;
+	dateFormat: string;
 	rmNewsDelay: number;
 	newsFilename: string;
 	specialPaths: Array<string>;
@@ -15,8 +16,9 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
 	newsLogo: '🆕',
-	detectNewsDelay: 7,
-	rmNewsDelay: 15,
+	detectNewsDelay: 15,
+	dateFormat: 'D',
+	rmNewsDelay: 30,
 	newsFilename: 'News.md',
 	specialPaths: ['News.md']
 }
@@ -51,9 +53,9 @@ export class SettingsMenu extends PluginSettingTab {
 
 		// Setting for the auto-detected news delay
 		new Setting(containerEl)
-			.setName("Detect news delay")
-			.setDesc(`Time used to detect news articles (in days), if an article had been modified before this delay, 
-					it will appear as new`)
+			.setName("News Detection delay")
+			.setDesc(`Time used to detect news articles (in days), if an article had been modified before this delay, ` +
+					`it will appear as new`)
 			.addText((text) =>
 				text
 					.setPlaceholder("number of days")
@@ -64,24 +66,39 @@ export class SettingsMenu extends PluginSettingTab {
 					})
 			)
 		
-		// Setting for the removal delay of old news
 		new Setting(containerEl)
-		.setName("removal of old news")
-		.setDesc("Time before considering an article 'not new anymore' and remove the symbol marking it")
-		.addText((text) =>
-			text
-				.setPlaceholder("number of days")
-				.setValue(this.plugin.settings.rmNewsDelay.toString())
-				.onChange(async (value) => {
-					this.plugin.settings.rmNewsDelay = Number(value);
-					await this.plugin.saveSettings();
-				})
-		)
-		
+			.setName(`Date format`)
+			.setDesc(createFragment(frag => {
+				frag.appendText(`This parameter allows to change the format of dates displayed in the news file created.`);
+				frag.createEl('br');
+				frag.createEl('br');
+				frag.appendText(`You can choose from :`);
+				let listOfChoices = createEl('ul');
+				listOfChoices.createEl('li', {text: 'None'});
+				listOfChoices.createEl('li', {text: 'Day : 5/12/2020'});
+				listOfChoices.createEl('li', {text: 'Day + Hour : 5/12/2020 10:50:21'});
+				listOfChoices.createEl('li', {text: 'Day of Week + Hour : Tue May 12 2020 10:50:21'});
+				frag.append(listOfChoices);
+			}))
+			.addDropdown((dropdown) => {
+				let possibleValues: Record<string, string> = {};
+				possibleValues['N'] = 'None';
+				possibleValues['D'] = 'Day';
+				possibleValues['DH'] = 'Day + Hour';
+				possibleValues['DOW'] = 'Day of Week + Hour';
+				dropdown
+					.addOptions(possibleValues)
+					.setValue(this.plugin.settings.dateFormat)
+					.onChange((value) => {
+						this.plugin.settings.dateFormat = value;
+						this.plugin.saveSettings();
+				});
+			})
+
 		// Setting for the news file name
 		new Setting(containerEl)
 			.setName("News file name")
-			.setDesc("Name of the file that will be created to show the news")
+			.setDesc("Name of the file that will be created to show the news.")
 			.addText((text: TextComponent) =>
 				text
 					.setPlaceholder("file name")
@@ -111,22 +128,57 @@ export class SettingsMenu extends PluginSettingTab {
 			)
         
         // Creates a button for editing the template file with Notepad++
-        const templateSetting = new Setting(containerEl)
-        templateSetting.setDesc(`Use this button to edit the template file used to create the News file.
-            You can use the %PNews%, %MNews% and %DNews% respectively for the pointed news, marked news and detected news.`);
+        const templateSetting = new Setting(containerEl);
+		templateSetting.setName(`Template file`);
+        templateSetting.setDesc(`Use this button to edit the template file used to create the News file. ` +
+            `Left button will use default editor binded to .md files. right button, will use notepad or gedit on Linux`);
         templateSetting.addButton((button: ButtonComponent) => {
             button.setClass('templateButton');
-            button.setButtonText('Template File');
+            button.setButtonText('Open default editor');
+            button.onClick(() => {
+                // This part opens the template file used for news
+                const basePath = (this.plugin.app.vault.adapter as any).basePath;
+                const tempFile = path.join(basePath, '.obsidian', 'plugins', this.plugin.manifest.id, 'Ressources', 'NewsTemplate.md');
+                
+				exec(`${getCommandLine()} "${tempFile}"`);
+            });
+        });
+		templateSetting.addButton((button: ButtonComponent) => {
+            button.setClass('templateButton');
+            button.setButtonText('Open Notepad / Gedit');
             button.onClick(() => {
                 // This part opens the template file used for news
                 const basePath = (this.plugin.app.vault.adapter as any).basePath;
                 const tempFile = path.join(basePath, '.obsidian', 'plugins', this.plugin.manifest.id, 'Ressources', 'NewsTemplate.md');
                 
 				// This is the part that needs to me modified to support multiples OS
-				exec(`${getCommandLine()} "${tempFile}"`);
+				// This is the part that needs to me modified to support multiples OS
+				if (platform == 'win32'){exec(`start notepad++ "${tempFile}"`)}
+				else if (platform == 'linux'){exec(`gedit "${tempFile}"`)}
+				else {
+					console.warn('OS not supported, cannot open template file with this button')
+				}
             });
         });
-
+		
+		// Setting for the removal delay of old news
+		new Setting(containerEl)
+			.setName("Removal of old news")
+			.setDesc(createFragment(frag => {
+				frag.appendText(`Time before considering an article 'not new anymore' and remove the symbol marking it.`);
+				frag.createEl('br');
+				frag.appendText(`This parameter is only used when clearing the vault with the button here under`);
+			}))
+			.addText((text) =>
+				text
+					.setPlaceholder("number of days")
+					.setValue(this.plugin.settings.rmNewsDelay.toString())
+					.onChange(async (value) => {
+						this.plugin.settings.rmNewsDelay = Number(value);
+						await this.plugin.saveSettings();
+					})
+			)
+		
 		// Creates a button to clean up the News marker that are not relevant anymore
         const cleanupSetting = new Setting(containerEl)
         cleanupSetting.setDesc(`Use this button to clean up news marker that are not relevant anymore.

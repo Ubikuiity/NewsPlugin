@@ -7,7 +7,7 @@ import * as path from "path";
 
 export class newsCleaner {
 
-    mainPlugin: NewsPlugin
+    mainPlugin: NewsPlugin;
     obsVault: Vault;
     pSettings: Settings;
 
@@ -29,6 +29,9 @@ export class newsCleaner {
         const now: Date = new Date();
 
         // Handle marked new files
+        let listOfOldNames: Array<string> = [];
+        let listOfNewNames: Array<string> = [];
+
         let count: number = 0;
         for (let mdFile of fCreator.markedNewFiles){
             const modDate = mdFile.stat.mtime;
@@ -42,6 +45,8 @@ export class newsCleaner {
                 try {
                     await fsp.access(oldPath);  // If path exists, execute next line
                     await fsp.rename(oldPath, newPath);  // rename old file to new file name
+                    listOfOldNames.push(mdFile.name.split('.')[0]);
+                    listOfNewNames.push(newName.split('.')[0]);
                     count ++;
                 } catch {
                     console.warn(`Unexpected error happened while trying to rename file ${oldPath} to ${newPath}`)
@@ -50,6 +55,9 @@ export class newsCleaner {
         }
         console.log(`Finished working with marked files, removed news marker from ${count} files`);
 
+        console.log(`Now renaming links in vault to match the new file names... This might take some time`)
+        const result = await this.changeAllLinks(listOfOldNames, listOfNewNames);
+        console.log(`Changed ${result[0]} files for a total of ${result[1]} links`);
 
         count = 0;
         // Handle pointed files
@@ -89,8 +97,8 @@ export class newsCleaner {
                         }
                     }
                     else{  // If we didn't find file
-                        console.warn(`Coudn't find linked file ${fileName} from ${pointerFile.name}.
-                        File might be missing or link weirdly formatted`)
+                        console.warn(`Coudn't find linked file ${fileName} from ${pointerFile.name}.` +
+                            `File might be missing or link weirdly formatted, check that file name doesn't contain a dot`)
                     }
                 }
                 else{
@@ -100,13 +108,8 @@ export class newsCleaner {
 
             if (shift > 0){
                 // If we remove more than 0 element, rewrite the file
-                const lastModificationDate = pointerFile.stat.mtime; // Keep modification date in memory
                 const fullPathFile: string = path.join(basePath, pointerFile.path);
-                const data = new Uint8Array(Buffer.from(content));
-                await fsp.writeFile(fullPathFile, data);
-
-                // Change modification date to put it back as it was before changing the file
-                await fsp.utimes(fullPathFile, now, new Date(lastModificationDate));
+                rewriteFile(pointerFile, fullPathFile, content);
                 count ++;
             }
         }
@@ -126,6 +129,54 @@ export class newsCleaner {
             }
         }
         return null;
+    }
+
+    /**
+     * Function used to recreate links of all files with new links if the pointed file name has been changed. This function can be quite expensive to run.
+     * 
+     * @param oldNames Old names of files.
+     * @param newNames New names of files, index must corresponds witlh oldNames array.
+     * 
+     * @return [number of file changed, number of links changed].
+     */
+    async changeAllLinks(oldNames: string[], newNames: string[]){
+        // Regex used to find link in file
+        const regexList: RegExp[] = oldNames.map((fileName: string): RegExp => {
+            return RegExp(`\\[{2}.*${fileName}\\]{2}`, 'g')
+        })
+
+        let linkCount: number = 0;
+        let fileCount: number = 0;
+        for (let mdFile of this.obsVault.getMarkdownFiles()){ // Iterate all file of vault
+            let content: string = await this.obsVault.cachedRead(mdFile);
+
+            let linksRenamed: number = 0;
+            let index: number = 0;
+            for (let linkRegex of regexList){  // For each name that has changed, look for a link in the file
+                let match: RegExpMatchArray | null;
+                while ((match = content.match(linkRegex)) != null){  // If we found a link
+                    const regName = new RegExp(oldNames[index], 'g');
+                    content = content.replace(linkRegex, match[0].replace(regName, newNames[index]));  // Replace the link with the new one
+
+                    linksRenamed ++;
+                    if (linksRenamed > 1000) {  // Check that we are not in an infinite loop
+                        console.warn(`Renamed more than 1000 links in ${mdFile.name}.` +
+                            `Stopping while renaming ${oldNames[index]} to ${newNames[index]}`);
+                        break
+                    };
+                }
+                index ++;
+            }
+            if (linksRenamed > 0)  // If we changed more than 1 link, rewrite file
+                {
+                    // change content of file
+                    const pathOfFile = path.join((this.obsVault.adapter as any).basePath, mdFile.path);
+                    rewriteFile(mdFile, pathOfFile, content);
+                    linkCount += linksRenamed;
+                    fileCount ++;
+                }
+        }
+        return [fileCount, linkCount];
     }
 }
 
@@ -147,4 +198,20 @@ function getFileNameFromLink(fileLink: string): string{
     res = res.split(`\\`).pop() as string;
     // Y -> Y  (Has no effect here, but useful if there are some \ in the path)
     return res
+}
+
+/**
+ * Rewrites a file without changing its modification date
+ * 
+ * @param file The file object to be modified
+ * @param filePath Path of the file to be modified
+ * @param content New content to write in file
+ */
+async function rewriteFile(file: TFile, filePath: string, content: string){
+const lastModificationDate = file.stat.mtime; // Keep modification date in memory
+const data = new Uint8Array(Buffer.from(content));
+await fsp.writeFile(filePath, data);
+
+// Change modification date to put it back as it was before changing the file
+await fsp.utimes(filePath, new Date(), new Date(lastModificationDate));
 }
