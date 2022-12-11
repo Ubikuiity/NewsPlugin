@@ -31,6 +31,8 @@ export default class NewsPlugin extends Plugin {
 			this.pageCreator.synchroAll();
 			new Notice(`reloading news page, please don't spam this button`);
 		});
+
+		console.log(`Loaded news plugin`)
 	}
 
 	onunload() {

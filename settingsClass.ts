@@ -26,6 +26,9 @@ export const DEFAULT_SETTINGS: Settings = {
 // This creates the menu where the user can change the parameters
 export class SettingsMenu extends PluginSettingTab {
 	plugin: NewsPlugin;
+	mainSettingsContainer: HTMLElement;
+	advancedSettingsContainer: HTMLElement;
+	cleanupSettingsContainer: HTMLElement;
 	specialPathsContainer: HTMLElement;
 
 	constructor(app: App, plugin: NewsPlugin) {
@@ -34,69 +37,15 @@ export class SettingsMenu extends PluginSettingTab {
 	}
 
 	display() {
-		let { containerEl } = this;
-		containerEl.empty();
+		let { containerEl: mainContainer } = this;
+		mainContainer.empty();
 
-		// Setting for the news Logo
-		new Setting(containerEl)
-			.setName("News Logo")
-			.setDesc("Icon used to mark news by hand")
-			.addText((text) =>
-				text
-					.setPlaceholder("News icon")
-					.setValue(this.plugin.settings.newsLogo)
-					.onChange(async (value) => {
-						this.plugin.settings.newsLogo = value;
-						await this.plugin.saveSettings();
-					})
-			)
-
-		// Setting for the auto-detected news delay
-		new Setting(containerEl)
-			.setName("News Detection delay")
-			.setDesc(`Time used to detect news articles (in days), if an article had been modified before this delay, ` +
-					`it will appear as new`)
-			.addText((text) =>
-				text
-					.setPlaceholder("number of days")
-					.setValue(this.plugin.settings.detectNewsDelay.toString())
-					.onChange(async (value) => {
-						this.plugin.settings.detectNewsDelay = Number(value);
-						await this.plugin.saveSettings();
-					})
-			)
+		// This containers has all the important parameters of the plugin
+		this.mainSettingsContainer = mainContainer.createEl("div");
+        this.mainSettingsContainer.createEl("h1", { text: "Main settings" });
 		
-		new Setting(containerEl)
-			.setName(`Date format`)
-			.setDesc(createFragment(frag => {
-				frag.appendText(`This parameter allows to change the format of dates displayed in the news file created.`);
-				frag.createEl('br');
-				frag.createEl('br');
-				frag.appendText(`You can choose from :`);
-				let listOfChoices = createEl('ul');
-				listOfChoices.createEl('li', {text: 'None'});
-				listOfChoices.createEl('li', {text: 'Day : 5/12/2020'});
-				listOfChoices.createEl('li', {text: 'Day + Hour : 5/12/2020 10:50:21'});
-				listOfChoices.createEl('li', {text: 'Day of Week + Hour : Tue May 12 2020 10:50:21'});
-				frag.append(listOfChoices);
-			}))
-			.addDropdown((dropdown) => {
-				let possibleValues: Record<string, string> = {};
-				possibleValues['N'] = 'None';
-				possibleValues['D'] = 'Day';
-				possibleValues['DH'] = 'Day + Hour';
-				possibleValues['DOW'] = 'Day of Week + Hour';
-				dropdown
-					.addOptions(possibleValues)
-					.setValue(this.plugin.settings.dateFormat)
-					.onChange((value) => {
-						this.plugin.settings.dateFormat = value;
-						this.plugin.saveSettings();
-				});
-			})
-
 		// Setting for the news file name
-		new Setting(containerEl)
+		new Setting(this.mainSettingsContainer)
 			.setName("News file name")
 			.setDesc("Name of the file that will be created to show the news.")
 			.addText((text: TextComponent) =>
@@ -126,12 +75,87 @@ export class SettingsMenu extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			)
+		
+		// Setting for the displayed date format in the news file
+		new Setting(this.mainSettingsContainer)
+			.setName(`Date format`)
+			.setDesc(createFragment(frag => {
+				frag.appendText(`This parameter allows to change the format of dates displayed in the news file created.`);
+				frag.createEl('br');
+				frag.createEl('br');
+				frag.appendText(`You can choose from :`);
+				let listOfChoices = createEl('ul');
+				listOfChoices.createEl('li', {text: 'None'});
+				listOfChoices.createEl('li', {text: 'Day : 5/12/2020'});
+				listOfChoices.createEl('li', {text: 'Day + Hour : 5/12/2020 10:50:21'});
+				listOfChoices.createEl('li', {text: 'Day of Week + Hour : Tue May 12 2020 10:50:21'});
+				frag.append(listOfChoices);
+			}))
+			.addDropdown((dropdown) => {
+				let possibleValues: Record<string, string> = {};
+				possibleValues['N'] = 'None';
+				possibleValues['D'] = 'Day';
+				possibleValues['DH'] = 'Day + Hour';
+				possibleValues['DOW'] = 'Day of Week + Hour';
+				dropdown
+					.addOptions(possibleValues)
+					.setValue(this.plugin.settings.dateFormat)
+					.onChange((value) => {
+						this.plugin.settings.dateFormat = value;
+						this.plugin.saveSettings();
+				});
+			})
+
+			
+		// Setting for the auto-detected news delay
+		new Setting(this.mainSettingsContainer)
+			.setName("News Detection delay")
+			.setDesc(`Time used to detect news articles (in days), if an article had been modified before this delay, ` +
+					`it will appear as new`)
+			.addText((text) =>
+				text
+					.setPlaceholder("number of days")
+					.setValue(this.plugin.settings.detectNewsDelay.toString())
+					.onChange(async (value) => {
+						this.plugin.settings.detectNewsDelay = Number(value);
+						await this.plugin.saveSettings();
+					})
+		)
+	
+		// This containers has all the advanced parameters of the plugin
+		this.advancedSettingsContainer = mainContainer.createEl("div");
+		this.advancedSettingsContainer.createEl("h1", { text: "Advanced settings" });
+				
+
+		// Setting for the news Logo
+		new Setting(this.advancedSettingsContainer)
+			.setName("News symbol")
+			.setDesc("Icon used to mark news by hand")
+			.addText((text) =>
+				text
+					.setPlaceholder("News icon")
+					.setValue(this.plugin.settings.newsLogo)
+					.onChange(async (value) => {
+						this.plugin.settings.newsLogo = value;
+						await this.plugin.saveSettings();
+					})
+			)
         
         // Creates a button for editing the template file with Notepad++
-        const templateSetting = new Setting(containerEl);
+        const templateSetting = new Setting(this.advancedSettingsContainer);
 		templateSetting.setName(`Template file`);
-        templateSetting.setDesc(`Use this button to edit the template file used to create the News file. ` +
-            `Left button will use default editor binded to .md files. right button, will use notepad or gedit on Linux`);
+        templateSetting.setDesc(createFragment(frag => {
+			frag.appendText(`Use this button to edit the template file used to create the News file. ` +
+            `Left button will use default editor binded to .md files. right button, will use notepad or gedit on Linux.`);
+			frag.createEl('br');
+			frag.createEl('br');
+			frag.appendText(`You can use the following tags in the file (tag will be replaced with files list) :`);
+			let listOfChoices = createEl('ul');
+			listOfChoices.createEl('li', {text: '%DNews% : Detected new files will be displayed here'});
+			listOfChoices.createEl('li', {text: '%MNews% : Files containing the new symbol in their names will be displayed here'});
+			listOfChoices.createEl('li', {text: '%PNews% : Links marked with new symbol will be displayed here'});
+			frag.append(listOfChoices);
+		}));
         templateSetting.addButton((button: ButtonComponent) => {
             button.setClass('templateButton');
             button.setButtonText('Open default editor');
@@ -153,7 +177,7 @@ export class SettingsMenu extends PluginSettingTab {
                 
 				// This is the part that needs to me modified to support multiples OS
 				// This is the part that needs to me modified to support multiples OS
-				if (platform == 'win32'){exec(`start notepad++ "${tempFile}"`)}
+				if (platform == 'win32'){exec(`start notepad "${tempFile}"`)}
 				else if (platform == 'linux'){exec(`gedit "${tempFile}"`)}
 				else {
 					console.warn('OS not supported, cannot open template file with this button')
@@ -161,8 +185,12 @@ export class SettingsMenu extends PluginSettingTab {
             });
         });
 		
+		// Cleanup settings
+		this.cleanupSettingsContainer = mainContainer.createEl("div");
+		this.cleanupSettingsContainer.createEl("h1", { text: "Cleanup settings" });
+
 		// Setting for the removal delay of old news
-		new Setting(containerEl)
+		new Setting(this.cleanupSettingsContainer)
 			.setName("Removal of old news")
 			.setDesc(createFragment(frag => {
 				frag.appendText(`Time before considering an article 'not new anymore' and remove the symbol marking it.`);
@@ -180,9 +208,15 @@ export class SettingsMenu extends PluginSettingTab {
 			)
 		
 		// Creates a button to clean up the News marker that are not relevant anymore
-        const cleanupSetting = new Setting(containerEl)
-        cleanupSetting.setDesc(`Use this button to clean up news marker that are not relevant anymore.
-		Be careful when using this button, some files will be modified and some file name can change.`);
+        const cleanupSetting = new Setting(this.cleanupSettingsContainer)
+		cleanupSetting.setName(`Vault cleanup`);
+        cleanupSetting.setDesc(createFragment(frag => {
+			frag.appendText(`Use this button to clean up news marker that are not relevant anymore. `);
+			frag.createEl('b', {text: 'Be careful when using this button, '});
+			frag.appendText(`some files will be modified and some file name can change.`);
+			frag.createEl('br');
+			frag.createEl('b', {text: 'It is wise to save the vault before using this button for the first time.'});
+		}));
         cleanupSetting.addButton((button: ButtonComponent) => {
             button.setClass('cleanupButton');
             button.setButtonText('Clean Vault');
@@ -193,7 +227,7 @@ export class SettingsMenu extends PluginSettingTab {
 
         // Creates the part of settings that contains the special paths that will not be detected when creating the News file
 		// This part handles the top part
-        this.specialPathsContainer = containerEl.createEl("div");
+        this.specialPathsContainer = mainContainer.createEl("div");
         this.specialPathsContainer.createEl("h1", { text: "Special pathes" });
         this.specialPathsContainer.createEl("div", { text: "This is the part that handle special paths that will be passed over when searching for news." });
 		
