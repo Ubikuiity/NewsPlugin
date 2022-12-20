@@ -1,4 +1,4 @@
-import { App, ButtonComponent, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, ButtonComponent, PluginSettingTab, Setting, TextComponent, Notice } from 'obsidian';
 import NewsPlugin from 'main';
 import { rename, access } from 'fs/promises';
 import { exec } from 'child_process';
@@ -220,8 +220,10 @@ export class SettingsMenu extends PluginSettingTab {
         cleanupSetting.addButton((button: ButtonComponent) => {
             button.setClass('cleanupButton');
             button.setButtonText('Clean Vault');
-            button.onClick(() => {
-                this.plugin.fileCleaner.clearNews();
+            button.onClick(async () => {
+				new Notice(`Cleaning vault...`);
+                await this.plugin.fileCleaner.clearNews();
+				new Notice(`Vault cleaned`);
             });
         });
 

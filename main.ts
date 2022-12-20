@@ -27,9 +27,10 @@ export default class NewsPlugin extends Plugin {
 		addIcon('NewSynchro', newSyncIc);
 
 		// This part creates the ribbon Icon to synchro the News file
-		const ribbonNewsSyncIcon = this.addRibbonIcon('NewSynchro', 'News Synchro', (evt: MouseEvent) => {
-			this.pageCreator.synchroAll();
-			new Notice(`reloading news page, please don't spam this button`);
+		const ribbonNewsSyncIcon = this.addRibbonIcon('NewSynchro', 'News Synchro', async (evt: MouseEvent) => {
+			new Notice(`Reloading news page, please don't spam this button`);
+			await this.pageCreator.synchroAll();
+			new Notice(`News page refreshed`);
 		});
 
 		console.log(`Loaded news plugin`)
