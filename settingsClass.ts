@@ -233,8 +233,8 @@ export class SettingsMenu extends PluginSettingTab {
 		
 		// Part with the button to create special pathes
 		const pathsSetting = new Setting(this.specialPathsContainer);
-		pathsSetting.setDesc('You can add special pathes here.' +
-					`If a file path in the vault contains one of the special pathes given here, he will be passed over when looking for news`);
+		pathsSetting.setDesc('You can add special pathes here. ' +
+					`If a file path in the vault contains one of the special pathes given here, he will be skipped when looking for news`);
         pathsSetting.addButton((button: ButtonComponent) => {
             button.setClass('addSpecialPathButton');
             button.setIcon('plus-with-circle');
