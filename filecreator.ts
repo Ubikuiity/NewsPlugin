@@ -172,6 +172,7 @@ export class fileCreator {
         const tagRegex = new RegExp(`%.News%`, "g");  // Regex used to detect tags in template file
 
         // Not a very elegant part, but detects differents tags in file and progressively splits the text.
+		// TODO This part needds to be rewritten as it can lead to unexpeccted behaviour if the template file includes multiple times the same tag 
         let regexMatch: RegExpMatchArray | null;
         while ((regexMatch = remainingText.match(tagRegex)) !== null) {
             tags.push(regexMatch[0][1]);
