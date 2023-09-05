@@ -5,7 +5,7 @@ import { Settings } from "settingsClass";
 import NewsPlugin from "main";
 import * as path from "path";
 
-// This interface is needed to represent a link in a file
+// This class is needed to represent a link in a file
 export class fileLink {
     pointedFile: TFile;  // The file being linked
     linkString: string;  // The string that contains the link to the file
@@ -31,15 +31,15 @@ export class fileCreator {
     obsVault: Vault;
     pSettings: Settings;
 
-    detectedNewFiles: Array<TFile> = [];
-    markedNewFiles: Array<TFile> = [];
-    pointedNewFiles: Array<fileLink> = [];
-    pointerToNewFiles: Array<TFile> = [];
+    detectedNewFiles: Array<TFile> = [];  // Array of detected new files
+    markedNewFiles: Array<TFile> = [];  // Array of file marked as new (with new logo in title)
+    pointedNewFiles: Array<fileLink> = [];  // Array of links marked as new (with new logo after the link)
+    pointerToNewFiles: Array<TFile> = [];  // Array containing the file that have links marked as new. This array is not used
 
-    templateTags: Array<string>;
-    templateSplitedText: Array<string>;
+    templateTags: Array<string>;  // Tags in the template file (ex: [D,P,M])
+    templateSplitedText: Array<string>;  // Template file splitted text
     
-    newsData: string;
+    newsData: string;  // The complete string of text to put in the news file that will be created
 
     /**
      * Class used to contruct the news file.
@@ -166,17 +166,16 @@ export class fileCreator {
 
         let remainingText: string = templateContent;
 
-        // Detecting files 
-        let tags: Array<string> = [];
+        // Detecting tags in template file
+        let tags: Array<string> = [];  // list of tags in order of reading
         let splitedTemplate: Array<string> = [];
-        const tagRegex = new RegExp(`%.News%`, "g");  // Regex used to detect tags in template file
+        const tagRegex = new RegExp(`%.News%`);  // Regex used to detect tags in template file
 
-        // Not a very elegant part, but detects differents tags in file and progressively splits the text.
-		// TODO This part needds to be rewritten as it can lead to unexpeccted behaviour if the template file includes multiple times the same tag 
+        // Not a very elegant part, but detects differents tags in file and progressively splits the template using tags as separators.
         let regexMatch: RegExpMatchArray | null;
         while ((regexMatch = remainingText.match(tagRegex)) !== null) {
             tags.push(regexMatch[0][1]);
-            const split: string[] = remainingText.split(regexMatch[0]);
+            const split: string[] = splitFirstOccurrence(remainingText, regexMatch[0]);
             splitedTemplate.push(split[0]);
             remainingText = split[1];
         }
@@ -210,9 +209,9 @@ export class fileCreator {
     }
 
     /**
-     * Function that creates the text put instead of %.News% depending on what character takes the place of the '.'
+     * Function that creates the text to put instead of %.News% depending on what character takes the place of the '.'
      * 
-     * @param tag Tag used to specify which news should be displayed here. Tags can be :
+     * @param tag Tag used to specify which new files should be displayed here. Tags can be :
      *  - D : Detected News
      *  - M : Marked News
      *  - P : Pointed News
@@ -223,7 +222,7 @@ export class fileCreator {
         const basePath = (this.obsVault.adapter as any).basePath;
 
         switch (tag){
-            case 'D': // Detected News (this one adds the date to the news)
+            case 'D': // Detected News
                 for (let detectedFile of this.detectedNewFiles) {
                     const pathOfFile: string = path.join(basePath, detectedFile.path);
                     const modDate: Date = (await fsp.stat(pathOfFile)).mtime;
@@ -245,7 +244,7 @@ export class fileCreator {
                 }
                 return finalData;
             default:
-                console.log(`Unexpected tag found : ${tag}`);
+                console.log(`Unexpected tag found : ${tag}, skipping this tag.`);
                 return finalData;
         }
     }
@@ -312,4 +311,13 @@ function getFileNameFromLink(fileLink: string): string{
     res = res.split(`\\`).pop() as string;
     // Y -> Y  (Has no effect here, but useful if there are some \ in the path)
     return res
+}
+
+/**
+* Function that splits a string only on the first occurence of the separator
+*/
+function splitFirstOccurrence(str: string, separator: string) {
+    const [first, ...rest] = str.split(separator);
+    const remainder = rest.join(separator);
+    return [first, remainder];
 }

@@ -130,12 +130,15 @@ export class SettingsMenu extends PluginSettingTab {
 		// Setting for the news Logo
 		new Setting(this.advancedSettingsContainer)
 			.setName("News symbol")
-			.setDesc("Icon used to mark news by hand")
+			.setDesc("Icon used to mark news by hand. This cannot be an empty string")
 			.addText((text) =>
 				text
 					.setPlaceholder("News icon")
 					.setValue(this.plugin.settings.newsLogo)
 					.onChange(async (value) => {
+						if (value == null || value == ''){
+							value = '🆕';  // Settings default value if left empty;
+						}
 						this.plugin.settings.newsLogo = value;
 						await this.plugin.saveSettings();
 					})
